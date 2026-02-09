@@ -9,7 +9,7 @@
   <h2>My Social Media App</h2>
 
   <button id="googleLogin">Login with Google</button>
-
+<button id="logoutBtn" style="display:none;">Logout</button>
   <p id="result"></p>
 
   <!-- JavaScript START -->
@@ -30,7 +30,17 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+import { signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
+const logoutBtn = document.getElementById("logoutBtn");
+
+// logout click
+logoutBtn.addEventListener("click", () => {
+  signOut(auth).then(() => {
+    alert("Logged out");
+    location.reload();
+  });
+});
     document.getElementById("googleLogin").addEventListener("click", () => {
       signInWithPopup(auth, provider)
         .then((result) => {
