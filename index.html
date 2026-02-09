@@ -3,282 +3,197 @@
 <head>
 <meta charset="UTF-8">
 <title>Chatroom</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
 <style>
 body{margin:0;font-family:Arial;background:#fafafa}
-header{background:#fff;padding:10px;border-bottom:1px solid #ddd;
-display:flex;justify-content:space-between;align-items:center;font-weight:bold}
-.container{max-width:600px;margin:auto;padding:10px;padding-bottom:70px}
-.card{background:#fff;border-radius:12px;border:1px solid #ddd;padding:12px;margin-bottom:12px}
-.hidden{display:none}
-.btn{padding:6px 10px;border:none;border-radius:6px;cursor:pointer}
-.primary{background:#0095f6;color:#fff}
-.danger{background:#ef4444;color:#fff}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;
+background:#fff;border-top:1px solid #ddd}
+nav button{flex:1;padding:12px;border:none;background:none;font-size:14px}
+.page{display:none;padding:15px;padding-bottom:70px}
+.page.active{display:block}
+.userRow{display:flex;justify-content:space-between;
+padding:8px;border-bottom:1px solid #eee}
+.btn{padding:5px 10px;border:none;border-radius:4px}
 .ghost{background:#eee}
-.avatar{width:70px;height:70px;border-radius:50%;background:#ddd;
-display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:bold}
-input,textarea{width:100%;padding:8px;border-radius:6px;border:1px solid #ccc}
-.postActions{display:flex;gap:12px;align-items:center}
-.like{cursor:pointer}
-.like.active{color:#e11d48;font-weight:bold}
-.comment{font-size:14px;margin:4px 0}
-.userRow{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
-.chatBox{height:260px;overflow:auto;border:1px solid #ddd;padding:6px;margin:6px 0}
-.msg{margin:4px 0}
-.me{text-align:right}
-small{color:#777}
-
-/* Bottom Nav */
-.nav{
-position:fixed;bottom:0;left:0;right:0;
-background:#fff;border-top:1px solid #ddd;
-display:flex;justify-content:space-around;padding:8px 0}
-.nav div{cursor:pointer;font-size:14px}
-.nav .active{font-weight:bold;color:#0095f6}
+.danger{background:#ff5252;color:#fff}
+.msg{padding:6px;margin:4px 0;background:#eee;border-radius:6px}
+.me{background:#cce5ff;text-align:right}
+input{width:100%;padding:8px;margin:5px 0}
 </style>
 </head>
-
 <body>
 
-<header>
-📸 Chatroom 
-<button id="logoutBtn" class="btn danger hidden">Logout</button>
-</header>
+<h3 style="text-align:center">Chatroom</h3>
 
-<div class="container">
-
-<!-- LOGIN -->
-<div id="loginCard" class="card">
-<button id="loginBtn" class="btn primary">Login with Google</button>
-</div>
+<button id="loginBtn">Login with Google</button>
+<button id="logoutBtn" style="display:none">Logout</button>
 
 <!-- HOME -->
-<div id="homePage" class="hidden">
-<div class="card">
-<textarea id="postText" placeholder="What's on your mind?"></textarea>
-<button class="btn primary" onclick="addPost()">Post</button>
-</div>
-<div id="posts"></div>
+<div id="home" class="page active">
+  <h4>Home</h4>
+  <p>Welcome 👋</p>
 </div>
 
 <!-- SEARCH -->
-<div id="searchPage" class="hidden">
-<div class="card">
-<input id="searchInput" placeholder="Search users">
-<div id="searchResults"></div>
-</div>
+<div id="search" class="page">
+  <h4>Search Users</h4>
+  <input id="searchInput" placeholder="Search by name">
+  <div id="searchResults"></div>
 </div>
 
 <!-- CHAT -->
-<div id="chatPage" class="hidden">
-<div class="card">
-<b>Live Chat</b>
-<input id="chatUid" placeholder="Enter User UID">
-<div class="chatBox" id="chatBox"></div>
-<input id="chatMsg" placeholder="Message">
-<button class="btn primary" onclick="sendMsg()">Send</button>
-</div>
+<div id="chat" class="page">
+  <h4>Chat</h4>
+  <input id="chatUid" placeholder="Enter User UID" oninput="openChat()">
+  <div id="chatBox"></div>
+  <input id="chatMsg" placeholder="Message">
+  <button onclick="sendMsg()">Send</button>
 </div>
 
 <!-- PROFILE -->
-<div id="profilePage" class="hidden">
-<div class="card">
-<div style="display:flex;gap:12px;align-items:center">
-<div class="avatar" id="avatar"></div>
-<div>
-<b id="myName"></b><br>
-<small>
-<span id="followers">0</span> followers ·
-<span id="following">0</span> following
-</small>
-</div>
-</div>
-<textarea id="bio" placeholder="Write bio"></textarea>
-<button class="btn ghost" onclick="saveBio()">Save Bio</button>
-</div>
+<div id="profile" class="page">
+  <h4>Profile</h4>
+  <p id="profileName"></p>
+  <p id="profileEmail"></p>
 </div>
 
-</div>
+<nav>
+  <button onclick="showPage('home')">Home</button>
+  <button onclick="showPage('search')">Search</button>
+  <button onclick="showPage('chat')">Chat</button>
+  <button onclick="showPage('profile')">Profile</button>
+</nav>
 
-<!-- BOTTOM NAV -->
-<div class="nav hidden" id="bottomNav">
-<div onclick="showPage('homePage',this)" class="active">🏠 Home</div>
-<div onclick="showPage('searchPage',this)">🔍 Search</div>
-<div onclick="showPage('chatPage',this)">💬 Chat</div>
-<div onclick="showPage('profilePage',this)">👤 Profile</div>
-</div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc,
+collection, getDocs, addDoc, onSnapshot,
+arrayUnion, arrayRemove, serverTimestamp }
+from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-<script>
-const firebaseConfig={
-apiKey:"AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
-authDomain:"chat-room-e55bf.firebaseapp.com",
-projectId:"chat-room-e55bf",
-storageBucket:"chat-room-e55bf.firebasestorage.app",
-messagingSenderId:"653408545862",
-appId:"1:653408545862:web:c3c04443d67a55f0a6ae47"
+const firebaseConfig = {
+  apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
+  authDomain: "chat-room-e55bf.firebaseapp.com",
+  projectId: "chat-room-e55bf",
+  storageBucket: "chat-room-e55bf.firebasestorage.app",
+  messagingSenderId: "653408545862",
+  appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
 };
-firebase.initializeApp(firebaseConfig);
 
-const auth=firebase.auth();
-const db=firebase.firestore();
-const provider=new firebase.auth.GoogleAuthProvider();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
 
-loginBtn.onclick=()=>auth.signInWithPopup(provider);
-logoutBtn.onclick=()=>auth.signOut();
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+
+loginBtn.onclick = () => signInWithPopup(auth, provider);
+logoutBtn.onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async user => {
+  if (!user) return;
+  loginBtn.style.display="none";
+  logoutBtn.style.display="block";
+
+  const ref = doc(db,"users",user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref,{
+      name:user.displayName,
+      email:user.email,
+      followers:[],
+      following:[]
+    });
+  }
+
+  profileName.innerText = "Name: " + user.displayName;
+  profileEmail.innerText = "Email: " + user.email;
+});
 
 /* NAV */
-function showPage(id,el){
-document.querySelectorAll(".container > div").forEach(d=>d.classList.add("hidden"));
-document.getElementById(id).classList.remove("hidden");
-document.querySelectorAll(".nav div").forEach(n=>n.classList.remove("active"));
-el.classList.add("active");
+function showPage(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
 }
+window.showPage = showPage;
 
-/* AUTH */
-auth.onAuthStateChanged(async user=>{
-if(user){
-loginCard.classList.add("hidden");
-homePage.classList.remove("hidden");
-bottomNav.classList.remove("hidden");
-logoutBtn.classList.remove("hidden");
+/* SEARCH + FOLLOW */
+searchInput.oninput = async () => {
+  searchResults.innerHTML="";
+  const text = searchInput.value.toLowerCase();
+  if(!text) return;
 
-myName.innerText=user.displayName;
-avatar.innerText=user.displayName.charAt(0);
+  const me = auth.currentUser.uid;
+  const mySnap = await getDoc(doc(db,"users",me));
+  const myFollowing = mySnap.data().following || [];
 
-const u=db.collection("users").doc(user.uid);
-if(!(await u.get()).exists){
-u.set({name:user.displayName,bio:"",followers:[],following:[]});
-}
-u.onSnapshot(s=>{
-followers.innerText=s.data().followers.length;
-following.innerText=s.data().following.length;
-bio.value=s.data().bio;
-});
-listenPosts();
-}
-});
-
-/* BIO */
-function saveBio(){
-db.collection("users").doc(auth.currentUser.uid).update({bio:bio.value});
-}
-
-/* SEARCH */
-searchInput.oninput=async()=>{
-searchResults.innerHTML="";
-if(!searchInput.value)return;
-const snap=await db.collection("users").get();
-snap.forEach(d=>{
-if(d.id!==auth.currentUser.uid &&
-d.data().name.toLowerCase().includes(searchInput.value.toLowerCase())){
-searchResults.innerHTML+=`
-<div class="userRow">
-${d.data().name}
-<button class="btn ghost" onclick="toggleFollow('${d.id}')">Follow</button>
-</div>`;
-}
-});
+  const snap = await getDocs(collection(db,"users"));
+  snap.forEach(d=>{
+    if(d.id!==me && d.data().name.toLowerCase().includes(text)){
+      const isF = myFollowing.includes(d.id);
+      searchResults.innerHTML += `
+        <div class="userRow">
+          ${d.data().name}
+          <button class="btn ${isF?'danger':'ghost'}"
+          onclick="toggleFollow('${d.id}')">
+          ${isF?'Unfollow':'Follow'}
+          </button>
+        </div>`;
+    }
+  });
 };
 
-async function toggleFollow(uid){
-const me=auth.currentUser.uid;
-const my=db.collection("users").doc(me);
-const t=db.collection("users").doc(uid);
-const s=await my.get();
-if(s.data().following.includes(uid)){
-my.update({following:firebase.firestore.FieldValue.arrayRemove(uid)});
-t.update({followers:firebase.firestore.FieldValue.arrayRemove(me)});
-}else{
-my.update({following:firebase.firestore.FieldValue.arrayUnion(uid)});
-t.update({followers:firebase.firestore.FieldValue.arrayUnion(me)});
-}
-}
+window.toggleFollow = async (uid)=>{
+  const me = auth.currentUser.uid;
+  const myRef = doc(db,"users",me);
+  const uRef = doc(db,"users",uid);
+  const snap = await getDoc(myRef);
+  const f = snap.data().following || [];
 
-/* POSTS */
-function addPost(){
-if(!postText.value.trim())return;
-db.collection("posts").add({
-text:postText.value,
-uid:auth.currentUser.uid,
-name:auth.currentUser.displayName,
-likes:[],
-time:firebase.firestore.FieldValue.serverTimestamp()
-});
-postText.value="";
-}
-
-function listenPosts(){
-db.collection("posts").orderBy("time","desc").onSnapshot(s=>{
-posts.innerHTML="";
-s.forEach(doc=>{
-const p=doc.data();
-const me=auth.currentUser.uid;
-posts.innerHTML+=`
-<div class="card">
-<b>${p.name}</b>
-<p>${p.text}</p>
-<div class="postActions">
-<span class="like ${p.likes.includes(me)?'active':''}"
-onclick="toggleLike('${doc.id}')">❤️ ${p.likes.length}</span>
-${p.uid===me?`<button class="btn danger"
-onclick="deletePost('${doc.id}')">Delete</button>`:''}
-</div>
-</div>`;
-});
-});
-}
-
-function toggleLike(id){
-const ref=db.collection("posts").doc(id);
-ref.get().then(s=>{
-ref.update({
-likes:s.data().likes.includes(auth.currentUser.uid)
-?firebase.firestore.FieldValue.arrayRemove(auth.currentUser.uid)
-:firebase.firestore.FieldValue.arrayUnion(auth.currentUser.uid)
-});
-});
-}
-
-function deletePost(id){
-db.collection("posts").doc(id).delete();
-}
+  if(f.includes(uid)){
+    await updateDoc(myRef,{following:arrayRemove(uid)});
+    await updateDoc(uRef,{followers:arrayRemove(me)});
+  } else {
+    await updateDoc(myRef,{following:arrayUnion(uid)});
+    await updateDoc(uRef,{followers:arrayUnion(me)});
+  }
+  searchInput.dispatchEvent(new Event("input"));
+};
 
 /* CHAT */
-function sendMsg(){
-const to=chatUid.value;
-if(!to||!chatMsg.value)return;
-const chatId=[auth.currentUser.uid,to].sort().join("_");
-db.collection("chats").doc(chatId).collection("msgs").add({
-from:auth.currentUser.uid,
-text:chatMsg.value,
-time:Date.now()
-});
-chatMsg.value="";
-loadChat();
-}
+let unsub=null;
+window.openChat = ()=>{
+  const to = chatUid.value;
+  if(!to) return;
+  const me = auth.currentUser.uid;
+  const chatId = [me,to].sort().join("_");
+  if(unsub) unsub();
+  unsub = onSnapshot(
+    collection(db,"chats",chatId,"msgs"),
+    snap=>{
+      chatBox.innerHTML="";
+      snap.forEach(d=>{
+        const m=d.data();
+        chatBox.innerHTML+=
+        `<div class="msg ${m.from===me?'me':''}">${m.text}</div>`;
+      });
+    }
+  );
+};
 
-function loadChat(){
-const to=chatUid.value;
-if(!to)return;
-const chatId=[auth.currentUser.uid,to].sort().join("_");
-db.collection("chats").doc(chatId).collection("msgs")
-.orderBy("time").onSnapshot(s=>{
-chatBox.innerHTML="";
-s.forEach(m=>{
-const x=m.data();
-chatBox.innerHTML+=`
-<div class="msg ${x.from===auth.currentUser.uid?'me':''}">
-${x.text}
-</div>`;
-});
-});
-}
+window.sendMsg = async ()=>{
+  const to = chatUid.value;
+  const text = chatMsg.value.trim();
+  if(!to||!text) return;
+  const me = auth.currentUser.uid;
+  const chatId = [me,to].sort().join("_");
+  await addDoc(collection(db,"chats",chatId,"msgs"),{
+    from:me,text,time:serverTimestamp()
+  });
+  chatMsg.value="";
+};
 </script>
-
 </body>
 </html>
