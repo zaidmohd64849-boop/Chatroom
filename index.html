@@ -2,75 +2,96 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Chatroom</title>
+<title>Social App</title>
 <style>
-body{margin:0;font-family:Arial;background:#fafafa}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;
-background:#fff;border-top:1px solid #ddd}
-nav button{flex:1;padding:12px;border:none;background:none;font-size:14px}
-.page{display:none;padding:15px;padding-bottom:70px}
+body{margin:0;font-family:Arial;background:#ece5dd}
+h3{text-align:center;background:#075e54;color:#fff;margin:0;padding:12px}
+.page{display:none;padding-bottom:70px}
 .page.active{display:block}
+
+/* bottom nav */
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;
+background:#fff;border-top:1px solid #ccc}
+nav button{flex:1;padding:10px;border:none;background:none;font-size:14px}
+
+/* search */
 .userRow{display:flex;justify-content:space-between;
-padding:8px;border-bottom:1px solid #eee}
+padding:10px;background:#fff;border-bottom:1px solid #eee}
 .btn{padding:5px 10px;border:none;border-radius:4px}
-.ghost{background:#eee}
-.danger{background:#ff5252;color:#fff}
-.msg{padding:6px;margin:4px 0;background:#eee;border-radius:6px}
-.me{background:#cce5ff;text-align:right}
-input{width:100%;padding:8px;margin:5px 0}
+.follow{background:#25d366;color:#fff}
+.unfollow{background:#ccc}
+
+/* chat ui */
+#chatBox{height:60vh;overflow-y:auto;padding:10px;background:#ece5dd}
+.msg{max-width:70%;padding:8px;margin:5px;border-radius:8px;
+font-size:14px;word-wrap:break-word}
+.me{margin-left:auto;background:#dcf8c6}
+.other{background:#fff}
+#chatBar{position:fixed;bottom:50px;left:0;right:0;
+display:flex;background:#f0f0f0;padding:5px}
+#chatBar input{flex:1;padding:8px;border-radius:20px;border:1px solid #ccc}
+#chatBar button{margin-left:5px;padding:8px 12px;border:none;
+background:#25d366;color:#fff;border-radius:50%}
 </style>
 </head>
 <body>
 
-<h3 style="text-align:center">Chatroom</h3>
+<h3>Mini Social App</h3>
 
 <button id="loginBtn">Login with Google</button>
 <button id="logoutBtn" style="display:none">Logout</button>
 
 <!-- HOME -->
 <div id="home" class="page active">
-  <h4>Home</h4>
-  <p>Welcome 👋</p>
+  <p style="padding:10px">Welcome 👋</p>
 </div>
 
 <!-- SEARCH -->
 <div id="search" class="page">
-  <h4>Search Users</h4>
-  <input id="searchInput" placeholder="Search by name">
+  <input id="searchInput" placeholder="Search users"
+  style="width:100%;padding:10px">
   <div id="searchResults"></div>
 </div>
 
 <!-- CHAT -->
 <div id="chat" class="page">
-  <h4>Chat</h4>
-  <input id="chatUid" placeholder="Enter User UID" oninput="openChat()">
+  <input id="chatUid" placeholder="Paste User UID"
+  style="width:100%;padding:10px" oninput="openChat()">
   <div id="chatBox"></div>
-  <input id="chatMsg" placeholder="Message">
-  <button onclick="sendMsg()">Send</button>
 </div>
 
 <!-- PROFILE -->
 <div id="profile" class="page">
-  <h4>Profile</h4>
-  <p id="profileName"></p>
-  <p id="profileEmail"></p>
+  <p id="pname"></p>
+  <p id="pemail"></p>
 </div>
 
 <nav>
-  <button onclick="showPage('home')">Home</button>
-  <button onclick="showPage('search')">Search</button>
-  <button onclick="showPage('chat')">Chat</button>
-  <button onclick="showPage('profile')">Profile</button>
+  <button onclick="show('home')">Home</button>
+  <button onclick="show('search')">Search</button>
+  <button onclick="show('chat')">Chat</button>
+  <button onclick="show('profile')">Profile</button>
 </nav>
 
+<div id="chatBar" style="display:none">
+  <input id="chatMsg" placeholder="Message">
+  <button onclick="sendMsg()">➤</button>
+</div>
+
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc,
-collection, getDocs, addDoc, onSnapshot,
-arrayUnion, arrayRemove, serverTimestamp }
-from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { initializeApp } from
+"https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import {
+getAuth,GoogleAuthProvider,signInWithPopup,
+signOut,onAuthStateChanged
+} from
+"https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import {
+getFirestore,doc,getDoc,setDoc,updateDoc,
+collection,getDocs,addDoc,onSnapshot,
+arrayUnion,arrayRemove,serverTimestamp
+} from
+"https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
@@ -81,118 +102,112 @@ const firebaseConfig = {
   appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
+const app=initializeApp(firebaseConfig);
+const auth=getAuth(app);
+const db=getFirestore(app);
+const provider=new GoogleAuthProvider();
 
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
+loginBtn.onclick=()=>signInWithPopup(auth,provider);
+logoutBtn.onclick=()=>signOut(auth);
 
-loginBtn.onclick = () => signInWithPopup(auth, provider);
-logoutBtn.onclick = () => signOut(auth);
+onAuthStateChanged(auth,async u=>{
+ if(!u) return;
+ loginBtn.style.display="none";
+ logoutBtn.style.display="block";
 
-onAuthStateChanged(auth, async user => {
-  if (!user) return;
-  loginBtn.style.display="none";
-  logoutBtn.style.display="block";
-
-  const ref = doc(db,"users",user.uid);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
-    await setDoc(ref,{
-      name:user.displayName,
-      email:user.email,
-      followers:[],
-      following:[]
-    });
-  }
-
-  profileName.innerText = "Name: " + user.displayName;
-  profileEmail.innerText = "Email: " + user.email;
+ const ref=doc(db,"users",u.uid);
+ if(!(await getDoc(ref)).exists()){
+   await setDoc(ref,{name:u.displayName,email:u.email,
+   followers:[],following:[]});
+ }
+ pname.innerText="Name: "+u.displayName;
+ pemail.innerText="Email: "+u.email;
 });
 
-/* NAV */
-function showPage(id){
-  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-}
-window.showPage = showPage;
-
-/* SEARCH + FOLLOW */
-searchInput.oninput = async () => {
-  searchResults.innerHTML="";
-  const text = searchInput.value.toLowerCase();
-  if(!text) return;
-
-  const me = auth.currentUser.uid;
-  const mySnap = await getDoc(doc(db,"users",me));
-  const myFollowing = mySnap.data().following || [];
-
-  const snap = await getDocs(collection(db,"users"));
-  snap.forEach(d=>{
-    if(d.id!==me && d.data().name.toLowerCase().includes(text)){
-      const isF = myFollowing.includes(d.id);
-      searchResults.innerHTML += `
-        <div class="userRow">
-          ${d.data().name}
-          <button class="btn ${isF?'danger':'ghost'}"
-          onclick="toggleFollow('${d.id}')">
-          ${isF?'Unfollow':'Follow'}
-          </button>
-        </div>`;
-    }
-  });
+/* nav */
+window.show=id=>{
+ document.querySelectorAll(".page")
+ .forEach(p=>p.classList.remove("active"));
+ document.getElementById(id).classList.add("active");
 };
 
-window.toggleFollow = async (uid)=>{
-  const me = auth.currentUser.uid;
-  const myRef = doc(db,"users",me);
-  const uRef = doc(db,"users",uid);
-  const snap = await getDoc(myRef);
-  const f = snap.data().following || [];
-
-  if(f.includes(uid)){
-    await updateDoc(myRef,{following:arrayRemove(uid)});
-    await updateDoc(uRef,{followers:arrayRemove(me)});
-  } else {
-    await updateDoc(myRef,{following:arrayUnion(uid)});
-    await updateDoc(uRef,{followers:arrayUnion(me)});
+/* search + follow */
+searchInput.oninput=async()=>{
+ searchResults.innerHTML="";
+ const me=auth.currentUser.uid;
+ const my=(await getDoc(doc(db,"users",me))).data().following;
+ const snap=await getDocs(collection(db,"users"));
+ snap.forEach(d=>{
+  if(d.id!==me && d.data().name
+  .toLowerCase().includes(searchInput.value.toLowerCase())){
+   const f=my.includes(d.id);
+   searchResults.innerHTML+=`
+    <div class="userRow">
+     ${d.data().name}
+     <button class="btn ${f?'unfollow':'follow'}"
+     onclick="toggleFollow('${d.id}')">
+     ${f?'Unfollow':'Follow'}
+     </button>
+    </div>`;
   }
-  searchInput.dispatchEvent(new Event("input"));
+ });
 };
 
-/* CHAT */
+window.toggleFollow=async(uid)=>{
+ const me=auth.currentUser.uid;
+ const myRef=doc(db,"users",me);
+ const uRef=doc(db,"users",uid);
+ const f=(await getDoc(myRef)).data().following;
+ if(f.includes(uid)){
+  await updateDoc(myRef,{following:arrayRemove(uid)});
+  await updateDoc(uRef,{followers:arrayRemove(me)});
+ }else{
+  await updateDoc(myRef,{following:arrayUnion(uid)});
+  await updateDoc(uRef,{followers:arrayUnion(me)});
+ }
+ searchInput.dispatchEvent(new Event("input"));
+};
+
+/* CHAT with FOLLOW CHECK */
 let unsub=null;
-window.openChat = ()=>{
-  const to = chatUid.value;
-  if(!to) return;
-  const me = auth.currentUser.uid;
-  const chatId = [me,to].sort().join("_");
-  if(unsub) unsub();
-  unsub = onSnapshot(
-    collection(db,"chats",chatId,"msgs"),
-    snap=>{
-      chatBox.innerHTML="";
-      snap.forEach(d=>{
-        const m=d.data();
-        chatBox.innerHTML+=
-        `<div class="msg ${m.from===me?'me':''}">${m.text}</div>`;
-      });
-    }
-  );
+window.openChat=async()=>{
+ chatBox.innerHTML="";
+ chatBar.style.display="none";
+ const to=chatUid.value;
+ if(!to) return;
+ const me=auth.currentUser.uid;
+ const my=(await getDoc(doc(db,"users",me))).data().following;
+ if(!my.includes(to)){
+  chatBox.innerHTML=
+  "<p style='padding:10px'>Follow user to start chat</p>";
+  return;
+ }
+ chatBar.style.display="flex";
+ const id=[me,to].sort().join("_");
+ if(unsub)unsub();
+ unsub=onSnapshot(
+ collection(db,"chats",id,"msgs"),
+ s=>{
+  chatBox.innerHTML="";
+  s.forEach(d=>{
+   const m=d.data();
+   chatBox.innerHTML+=`
+    <div class="msg ${m.from===me?'me':'other'}">
+    ${m.text}</div>`;
+  });
+  chatBox.scrollTop=chatBox.scrollHeight;
+ });
 };
 
-window.sendMsg = async ()=>{
-  const to = chatUid.value;
-  const text = chatMsg.value.trim();
-  if(!to||!text) return;
-  const me = auth.currentUser.uid;
-  const chatId = [me,to].sort().join("_");
-  await addDoc(collection(db,"chats",chatId,"msgs"),{
-    from:me,text,time:serverTimestamp()
-  });
-  chatMsg.value="";
+window.sendMsg=async()=>{
+ const t=chatMsg.value.trim();
+ if(!t) return;
+ const me=auth.currentUser.uid;
+ const to=chatUid.value;
+ const id=[me,to].sort().join("_");
+ await addDoc(collection(db,"chats",id,"msgs"),
+ {from:me,text:t,time:serverTimestamp()});
+ chatMsg.value="";
 };
 </script>
 </body>
