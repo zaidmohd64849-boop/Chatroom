@@ -223,11 +223,18 @@ function loadChat(){
     snap=>{
       chatBox.innerHTML="";
       snap.forEach(m=>{
-        chatBox.innerHTML+=`
-          <div class="msg ${m.data().uid===me.uid?'me':'other'}">
-            ${m.data().text}
-          </div>`;
-      });
+  const msg = m.data();
+
+  // 👇 CLEAR CHAT FILTER (YAHI MAIN LINE HAI)
+  if (clearedAt && msg.time && msg.time.toMillis() <= clearedAt.toMillis()) {
+    return; // purana message skip
+  }
+
+  chatBox.innerHTML+=`
+    <div class="msg ${msg.uid===me.uid?'me':'other'}">
+      ${msg.text}
+    </div>`;
+});
       chatBox.scrollTop=chatBox.scrollHeight;
     }
   );
@@ -243,8 +250,18 @@ window.sendMsg = async e=>{
     msgInput.value="";
   }
 };
-  window.clearChat = () => {
+import { doc, setDoc, serverTimestamp, getDoc }
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+window.clearChat = async () => {
+  if (!currentChatId) return;
+
   if (confirm("Clear chat? (sirf aapke liye)")) {
+    await setDoc(
+      doc(db, "users", me.uid, "clearedChats", currentChatId),
+      { clearedAt: serverTimestamp() }
+    );
+
     document.getElementById("chatBox").innerHTML = "";
   }
 };
