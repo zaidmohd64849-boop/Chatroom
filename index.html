@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Google Login Test</title>
+  <title>My Social Media App</title>
   <meta charset="UTF-8">
 </head>
 <body>
@@ -9,51 +9,63 @@
   <h2>My Social Media App</h2>
 
   <button id="googleLogin">Login with Google</button>
-<button id="logoutBtn" style="display:none;">Logout</button>
+  <button id="logoutBtn" style="display:none;">Logout</button>
+
   <p id="result"></p>
 
-  <!-- JavaScript START -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup }
-    from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
- const firebaseConfig = {
-  apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
-  authDomain: "chat-room-e55bf.firebaseapp.com",
-  projectId: "chat-room-e55bf",
-  storageBucket: "chat-room-e55bf.firebasestorage.app",
-  messagingSenderId: "653408545862",
-  appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
-};
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
+      authDomain: "chat-room-e55bf.firebaseapp.com",
+      projectId: "chat-room-e55bf",
+      storageBucket: "chat-room-e55bf.firebasestorage.app",
+      messagingSenderId: "653408545862",
+      appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
+    };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
-import { signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
-const logoutBtn = document.getElementById("logoutBtn");
+    const loginBtn = document.getElementById("googleLogin");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const result = document.getElementById("result");
 
-// logout click
-logoutBtn.addEventListener("click", () => {
-  signOut(auth).then(() => {
-    alert("Logged out");
-    location.reload();
-  });
-});
-    document.getElementById("googleLogin").addEventListener("click", () => {
-      signInWithPopup(auth, provider)
-        .then((result) => {
-          document.getElementById("result").innerText =
-            "Welcome " + result.user.displayName;
-        })
-        .catch((error) => {
-          document.getElementById("result").innerText =
-            "Error: " + error.message;
-        });
+    // Login
+    loginBtn.addEventListener("click", () => {
+      signInWithPopup(auth, provider).catch(err => {
+        result.innerText = "Error: " + err.message;
+      });
+    });
+
+    // Logout
+    logoutBtn.addEventListener("click", () => {
+      signOut(auth);
+    });
+
+    // 🔥 MAIN LOGIC (IMPORTANT)
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        result.innerText = "Welcome " + user.displayName;
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+      } else {
+        result.innerText = "";
+        loginBtn.style.display = "inline-block";
+        logoutBtn.style.display = "none";
+      }
     });
   </script>
-  <!-- JavaScript END -->
 
 </body>
 </html>
