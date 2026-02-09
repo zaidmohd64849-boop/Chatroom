@@ -6,122 +6,128 @@
 </head>
 <body>
 
-  <h2>My Social Media App</h2>
+<h2>My Social Media App</h2>
 
-  <button id="googleLogin">Login with Google</button>
-  <button id="logoutBtn" style="display:none;">Logout</button>
+<button id="googleLogin">Login with Google</button>
+<button id="logoutBtn" style="display:none;">Logout</button>
 
-  <p id="result"></p>
+<p id="result"></p>
 
-  <hr>
+<hr>
 
-  <!-- Post box -->
-  <div id="postBox" style="display:none;">
-    <textarea id="postText" placeholder="What's on your mind?"></textarea><br><br>
-    <button id="addPost">Post</button>
-  </div>
+<div id="postBox" style="display:none;">
+  <textarea id="postText" placeholder="What's on your mind?"></textarea><br><br>
+  <button id="addPost">Post</button>
+</div>
 
-  <hr>
+<hr>
 
-  <!-- Posts -->
-  <div id="posts"></div>
+<div id="posts"></div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-  import {
-    getAuth,
-    GoogleAuthProvider,
-    signInWithPopup,
-    signOut,
-    onAuthStateChanged
-  } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
-  import {
-    getFirestore,
-    collection,
-    addDoc,
-    query,
-    orderBy,
-    onSnapshot,
-    serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
+  doc,
+  updateDoc,
+  increment
+} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
-    authDomain: "chat-room-e55bf.firebaseapp.com",
-    projectId: "chat-room-e55bf",
-    storageBucket: "chat-room-e55bf.firebasestorage.app",
-    messagingSenderId: "653408545862",
-    appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
+  authDomain: "chat-room-e55bf.firebaseapp.com",
+  projectId: "chat-room-e55bf",
+  storageBucket: "chat-room-e55bf.firebasestorage.app",
+  messagingSenderId: "653408545862",
+  appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const provider = new GoogleAuthProvider();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
 
-  const loginBtn = document.getElementById("googleLogin");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const result = document.getElementById("result");
-  const postBox = document.getElementById("postBox");
-  const postText = document.getElementById("postText");
-  const addPost = document.getElementById("addPost");
-  const postsDiv = document.getElementById("posts");
+const loginBtn = document.getElementById("googleLogin");
+const logoutBtn = document.getElementById("logoutBtn");
+const result = document.getElementById("result");
+const postBox = document.getElementById("postBox");
+const postText = document.getElementById("postText");
+const addPost = document.getElementById("addPost");
+const postsDiv = document.getElementById("posts");
 
-  // Login
-  loginBtn.onclick = () => {
-    signInWithPopup(auth, provider);
-  };
+// Login
+loginBtn.onclick = () => signInWithPopup(auth, provider);
 
-  // Logout
-  logoutBtn.onclick = () => {
-    signOut(auth);
-  };
+// Logout
+logoutBtn.onclick = () => signOut(auth);
 
-  // Auth state
-  onAuthStateChanged(auth, user => {
-    if (user) {
-      result.innerText = "Welcome " + user.displayName;
-      loginBtn.style.display = "none";
-      logoutBtn.style.display = "inline";
-      postBox.style.display = "block";
-    } else {
-      result.innerText = "";
-      loginBtn.style.display = "inline";
-      logoutBtn.style.display = "none";
-      postBox.style.display = "none";
-    }
+// Auth state
+onAuthStateChanged(auth, user => {
+  if (user) {
+    result.innerText = "Welcome " + user.displayName;
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "inline";
+    postBox.style.display = "block";
+  } else {
+    result.innerText = "";
+    loginBtn.style.display = "inline";
+    logoutBtn.style.display = "none";
+    postBox.style.display = "none";
+  }
+});
+
+// Add post
+addPost.onclick = async () => {
+  if (postText.value.trim() === "") return;
+
+  await addDoc(collection(db, "posts"), {
+    text: postText.value,
+    user: auth.currentUser.displayName,
+    time: serverTimestamp(),
+    likes: 0
   });
 
-  // Add post
-  addPost.onclick = async () => {
-    if (postText.value.trim() === "") return;
+  postText.value = "";
+};
 
-    await addDoc(collection(db, "posts"), {
-      text: postText.value,
-      user: auth.currentUser.displayName,
-      time: serverTimestamp()
-    });
-
-    postText.value = "";
-  };
-
-  // Read posts (live)
-  const q = query(collection(db, "posts"), orderBy("time", "desc"));
-  onSnapshot(q, snapshot => {
-    postsDiv.innerHTML = "";
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      postsDiv.innerHTML += `
-        <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
-          <b>${data.user}</b><br>
-          ${data.text}<br>
-          <small>${data.time?.toDate().toLocaleString() || ""}</small>
-        </div>
-      `;
-    });
+// Read posts (live)
+const q = query(collection(db, "posts"), orderBy("time", "desc"));
+onSnapshot(q, snapshot => {
+  postsDiv.innerHTML = "";
+  snapshot.forEach(d => {
+    const data = d.data();
+    postsDiv.innerHTML += `
+      <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+        <b>${data.user}</b><br>
+        ${data.text}<br><br>
+        <button onclick="likePost('${d.id}')">❤️ Like (${data.likes || 0})</button><br>
+        <small>${data.time?.toDate().toLocaleString() || ""}</small>
+      </div>
+    `;
   });
+});
 
+// Like function (global)
+window.likePost = async (id) => {
+  const postRef = doc(db, "posts", id);
+  await updateDoc(postRef, {
+    likes: increment(1)
+  });
+};
 </script>
 
 </body>
