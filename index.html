@@ -8,91 +8,121 @@
 
   <h2>My Social Media App</h2>
 
-  <!-- Login / Logout -->
   <button id="googleLogin">Login with Google</button>
   <button id="logoutBtn" style="display:none;">Logout</button>
 
   <p id="result"></p>
 
-  <!-- Post Section -->
+  <hr>
+
+  <!-- Post box -->
   <div id="postBox" style="display:none;">
-    <textarea id="postText" placeholder="What's on your mind?" rows="4" cols="40"></textarea>
-    <br><br>
-    <button id="postBtn">Post</button>
+    <textarea id="postText" placeholder="What's on your mind?"></textarea><br><br>
+    <button id="addPost">Post</button>
   </div>
 
-  <h3>Posts</h3>
+  <hr>
+
+  <!-- Posts -->
   <div id="posts"></div>
 
-  <!-- JavaScript -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-    import { 
-      getAuth, 
-      GoogleAuthProvider, 
-      signInWithPopup, 
-      signOut, 
-      onAuthStateChanged 
-    } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
-      authDomain: "chat-room-e55bf.firebaseapp.com",
-      projectId: "chat-room-e55bf",
-      storageBucket: "chat-room-e55bf.appspot.com",
-      messagingSenderId: "653408545862",
-      appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
-    };
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    query,
+    orderBy,
+    onSnapshot,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
+  const firebaseConfig = {
+    apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
+    authDomain: "chat-room-e55bf.firebaseapp.com",
+    projectId: "chat-room-e55bf",
+    storageBucket: "chat-room-e55bf.firebasestorage.app",
+    messagingSenderId: "653408545862",
+    appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
+  };
 
-    const loginBtn = document.getElementById("googleLogin");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const result = document.getElementById("result");
-    const postBox = document.getElementById("postBox");
-    const postBtn = document.getElementById("postBtn");
-    const postText = document.getElementById("postText");
-    const postsDiv = document.getElementById("posts");
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
 
-    // Login
-    loginBtn.addEventListener("click", () => {
-      signInWithPopup(auth, provider);
+  const loginBtn = document.getElementById("googleLogin");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const result = document.getElementById("result");
+  const postBox = document.getElementById("postBox");
+  const postText = document.getElementById("postText");
+  const addPost = document.getElementById("addPost");
+  const postsDiv = document.getElementById("posts");
+
+  // Login
+  loginBtn.onclick = () => {
+    signInWithPopup(auth, provider);
+  };
+
+  // Logout
+  logoutBtn.onclick = () => {
+    signOut(auth);
+  };
+
+  // Auth state
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      result.innerText = "Welcome " + user.displayName;
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline";
+      postBox.style.display = "block";
+    } else {
+      result.innerText = "";
+      loginBtn.style.display = "inline";
+      logoutBtn.style.display = "none";
+      postBox.style.display = "none";
+    }
+  });
+
+  // Add post
+  addPost.onclick = async () => {
+    if (postText.value.trim() === "") return;
+
+    await addDoc(collection(db, "posts"), {
+      text: postText.value,
+      user: auth.currentUser.displayName,
+      time: serverTimestamp()
     });
 
-    // Logout
-    logoutBtn.addEventListener("click", () => {
-      signOut(auth);
+    postText.value = "";
+  };
+
+  // Read posts (live)
+  const q = query(collection(db, "posts"), orderBy("time", "desc"));
+  onSnapshot(q, snapshot => {
+    postsDiv.innerHTML = "";
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      postsDiv.innerHTML += `
+        <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+          <b>${data.user}</b><br>
+          ${data.text}<br>
+          <small>${data.time?.toDate().toLocaleString() || ""}</small>
+        </div>
+      `;
     });
+  });
 
-    // Auth state
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        result.innerText = "Welcome " + user.displayName;
-        loginBtn.style.display = "none";
-        logoutBtn.style.display = "inline";
-        postBox.style.display = "block";
-      } else {
-        result.innerText = "";
-        loginBtn.style.display = "inline";
-        logoutBtn.style.display = "none";
-        postBox.style.display = "none";
-        postsDiv.innerHTML = "";
-      }
-    });
-
-    // Post
-    postBtn.addEventListener("click", () => {
-      if (postText.value.trim() === "") return;
-
-      const post = document.createElement("p");
-      post.innerText = "📝 " + postText.value;
-      postsDiv.prepend(post);
-
-      postText.value = "";
-    });
-  </script>
+</script>
 
 </body>
 </html>
