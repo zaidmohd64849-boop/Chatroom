@@ -3,52 +3,43 @@
 <head>
   <title>My Social Media App</title>
   <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-    }
-    img {
-      border-radius: 50%;
-      margin-top: 10px;
-    }
-    #profile {
-      display: none;
-      margin-top: 20px;
-    }
-  </style>
 </head>
 <body>
 
   <h2>My Social Media App</h2>
 
+  <!-- Login / Logout -->
   <button id="googleLogin">Login with Google</button>
   <button id="logoutBtn" style="display:none;">Logout</button>
 
-  <div id="profile">
-    <img id="userPic" width="100" />
-    <h3 id="userName"></h3>
-    <p id="userEmail"></p>
-  </div>
-
   <p id="result"></p>
 
-  <!-- Firebase JS -->
+  <!-- Post Section -->
+  <div id="postBox" style="display:none;">
+    <textarea id="postText" placeholder="What's on your mind?" rows="4" cols="40"></textarea>
+    <br><br>
+    <button id="postBtn">Post</button>
+  </div>
+
+  <h3>Posts</h3>
+  <div id="posts"></div>
+
+  <!-- JavaScript -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-    import {
-      getAuth,
-      GoogleAuthProvider,
-      signInWithPopup,
-      signOut,
-      onAuthStateChanged
+    import { 
+      getAuth, 
+      GoogleAuthProvider, 
+      signInWithPopup, 
+      signOut, 
+      onAuthStateChanged 
     } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
       authDomain: "chat-room-e55bf.firebaseapp.com",
       projectId: "chat-room-e55bf",
-      storageBucket: "chat-room-e55bf.firebasestorage.app",
+      storageBucket: "chat-room-e55bf.appspot.com",
       messagingSenderId: "653408545862",
       appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
     };
@@ -59,7 +50,11 @@
 
     const loginBtn = document.getElementById("googleLogin");
     const logoutBtn = document.getElementById("logoutBtn");
-    const profile = document.getElementById("profile");
+    const result = document.getElementById("result");
+    const postBox = document.getElementById("postBox");
+    const postBtn = document.getElementById("postBtn");
+    const postText = document.getElementById("postText");
+    const postsDiv = document.getElementById("posts");
 
     // Login
     loginBtn.addEventListener("click", () => {
@@ -71,21 +66,31 @@
       signOut(auth);
     });
 
-    // Auth State
+    // Auth state
     onAuthStateChanged(auth, (user) => {
       if (user) {
+        result.innerText = "Welcome " + user.displayName;
         loginBtn.style.display = "none";
-        logoutBtn.style.display = "inline-block";
-        profile.style.display = "block";
-
-        document.getElementById("userName").innerText = user.displayName;
-        document.getElementById("userEmail").innerText = user.email;
-        document.getElementById("userPic").src = user.photoURL;
+        logoutBtn.style.display = "inline";
+        postBox.style.display = "block";
       } else {
-        loginBtn.style.display = "inline-block";
+        result.innerText = "";
+        loginBtn.style.display = "inline";
         logoutBtn.style.display = "none";
-        profile.style.display = "none";
+        postBox.style.display = "none";
+        postsDiv.innerHTML = "";
       }
+    });
+
+    // Post
+    postBtn.addEventListener("click", () => {
+      if (postText.value.trim() === "") return;
+
+      const post = document.createElement("p");
+      post.innerText = "📝 " + postText.value;
+      postsDiv.prepend(post);
+
+      postText.value = "";
     });
   </script>
 
