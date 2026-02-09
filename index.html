@@ -3,196 +3,235 @@
 <head>
 <meta charset="UTF-8">
 <title>My Social Media App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <style>
-body{
-  font-family: Arial;
-  background:#fafafa;
-  margin:0;
-}
-header{
-  background:#fff;
-  padding:10px;
-  border-bottom:1px solid #ddd;
-  display:flex;
-  justify-content:space-between;
-}
-.container{
-  max-width:600px;
-  margin:auto;
-  padding:10px;
-}
-.card{
-  background:#fff;
-  padding:10px;
-  border:1px solid #ddd;
-  margin-bottom:10px;
-  border-radius:5px;
-}
-button{
-  padding:5px 10px;
-  cursor:pointer;
-}
-.follow-btn{
-  background:#3897f0;
-  color:white;
-  border:none;
-  border-radius:3px;
-}
-.unfollow{
-  background:#aaa;
-}
-.post{
-  border-top:1px solid #eee;
-  padding-top:5px;
-}
+body{margin:0;font-family:Arial;background:#fafafa}
+header{background:#fff;border-bottom:1px solid #ddd;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-weight:bold}
+.container{max-width:600px;margin:auto;padding:10px}
+.card{background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px;margin-bottom:12px}
+.hidden{display:none}
+.profile{display:flex;gap:12px;align-items:center}
+.dp{width:64px;height:64px;border-radius:50%;background:#ddd}
+.btn{padding:7px 10px;border-radius:6px;border:none;cursor:pointer}
+.primary{background:#0095f6;color:#fff}
+.danger{background:#ef4444;color:#fff}
+.ghost{background:#eee}
+.post h4{margin:0 0 4px}
+.actions{display:flex;gap:12px;margin-top:6px}
+.like{cursor:pointer;color:#555}
+.like.active{color:#e11d48;font-weight:bold}
+.follow{margin-left:auto}
+.comment{font-size:14px;margin:4px 0}
+input,textarea{width:100%;padding:8px;border-radius:6px;border:1px solid #ccc}
+small{color:#777}
 </style>
 </head>
 
 <body>
 
 <header>
-  <b>🔥 My Social Media App</b>
-  <button id="logout">Logout</button>
+  🔥 My Social Media App
+  <button id="logoutBtn" class="btn danger hidden">Logout</button>
 </header>
 
 <div class="container">
 
-<div class="card">
-  <h3 id="myName"></h3>
-  <input id="bio" placeholder="Bio">
-  <button onclick="saveBio()">Save Bio</button>
-  <p>
-    Followers: <span id="followers">0</span> |
-    Following: <span id="following">0</span>
-  </p>
+<!-- LOGIN -->
+<div id="loginCard" class="card">
+  <button id="loginBtn" class="btn primary">Login with Google</button>
 </div>
 
-<div class="card">
-  <input id="postText" placeholder="What's on your mind?" style="width:100%">
-  <button onclick="addPost()">Post</button>
+<!-- PROFILE -->
+<div id="profileCard" class="card hidden">
+  <div class="profile">
+    <div class="dp"></div>
+    <div>
+      <b id="meName"></b><br>
+      <small>
+        <span id="followerCount">0</span> followers ·
+        <span id="followingCount">0</span> following
+      </small>
+    </div>
+  </div>
 </div>
 
+<!-- CREATE POST -->
+<div id="postCard" class="card hidden">
+  <textarea id="postText" placeholder="What's on your mind?"></textarea>
+  <button class="btn primary" onclick="addPost()">Post</button>
+</div>
+
+<!-- POSTS -->
 <div id="posts"></div>
 
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import {
- getAuth, GoogleAuthProvider,
- signInWithPopup, signOut, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-
-import {
- getFirestore, doc, setDoc, getDoc,
- updateDoc, arrayUnion, arrayRemove,
- addDoc, collection, onSnapshot
-} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
-
+<script>
+/* 🔥 FIREBASE CONFIG (YOURS) */
 const firebaseConfig = {
- apiKey: "YOUR_API_KEY",
- authDomain: "YOUR_PROJECT.firebaseapp.com",
- projectId: "YOUR_PROJECT"
+  apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
+  authDomain: "chat-room-e55bf.firebaseapp.com",
+  projectId: "chat-room-e55bf",
+  storageBucket: "chat-room-e55bf.firebasestorage.app",
+  messagingSenderId: "653408545862",
+  appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
 };
+firebase.initializeApp(firebaseConfig);
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const provider = new firebase.auth.GoogleAuthProvider();
 
-const provider = new GoogleAuthProvider();
+/* ELEMENTS */
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const loginCard = document.getElementById("loginCard");
+const profileCard = document.getElementById("profileCard");
+const postCard = document.getElementById("postCard");
+const postsDiv = document.getElementById("posts");
+const meName = document.getElementById("meName");
+const followerCount = document.getElementById("followerCount");
+const followingCount = document.getElementById("followingCount");
 
-let currentUser;
+/* AUTH */
+loginBtn.onclick = ()=> auth.signInWithPopup(provider);
+logoutBtn.onclick = ()=> auth.signOut();
 
-// LOGIN
-onAuthStateChanged(auth, async(user)=>{
- if(!user){
-   signInWithPopup(auth, provider);
- }else{
-   currentUser = user;
-   document.getElementById("myName").innerText = user.displayName;
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    loginCard.classList.add("hidden");
+    profileCard.classList.remove("hidden");
+    postCard.classList.remove("hidden");
+    logoutBtn.classList.remove("hidden");
+    meName.innerText = user.displayName;
 
-   const ref = doc(db,"users",user.uid);
-   const snap = await getDoc(ref);
-
-   if(!snap.exists()){
-     await setDoc(ref,{
-       name:user.displayName,
-       bio:"",
-       followers:[],
-       following:[]
-     });
-   }
-   loadProfile();
-   loadPosts();
- }
+    // ensure user doc
+    const uref = db.collection("users").doc(user.uid);
+    const usnap = await uref.get();
+    if(!usnap.exists){
+      await uref.set({name:user.displayName, followers:[], following:[]});
+    }
+    listenProfile();
+    listenPosts();
+  }else{
+    loginCard.classList.remove("hidden");
+    profileCard.classList.add("hidden");
+    postCard.classList.add("hidden");
+    logoutBtn.classList.add("hidden");
+    postsDiv.innerHTML="";
+  }
 });
 
-// LOGOUT
-logout.onclick=()=>signOut(auth);
-
-// SAVE BIO
-async function saveBio(){
- const ref = doc(db,"users",currentUser.uid);
- await updateDoc(ref,{ bio: bio.value });
- alert("Bio updated");
+/* PROFILE COUNTS */
+function listenProfile(){
+  const uid = auth.currentUser.uid;
+  db.collection("users").doc(uid).onSnapshot(s=>{
+    const d=s.data();
+    followerCount.innerText = d.followers.length;
+    followingCount.innerText = d.following.length;
+  });
 }
 
-// LOAD PROFILE
-async function loadProfile(){
- const snap = await getDoc(doc(db,"users",currentUser.uid));
- const d = snap.data();
- bio.value = d.bio;
- followers.innerText = d.followers.length;
- following.innerText = d.following.length;
+/* ADD POST */
+function addPost(){
+  const text = postText.value.trim();
+  if(!text) return;
+  db.collection("posts").add({
+    text,
+    uid: auth.currentUser.uid,
+    name: auth.currentUser.displayName,
+    likes: [],
+    time: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  postText.value="";
 }
 
-// ADD POST
-async function addPost(){
- if(!postText.value) return;
- await addDoc(collection(db,"posts"),{
-   text:postText.value,
-   userId:currentUser.uid,
-   userName:currentUser.displayName,
-   time:Date.now()
- });
- postText.value="";
+/* FOLLOW / UNFOLLOW */
+async function toggleFollow(targetUid){
+  const me = auth.currentUser.uid;
+  const myRef = db.collection("users").doc(me);
+  const tRef = db.collection("users").doc(targetUid);
+  const mySnap = await myRef.get();
+  const following = mySnap.data().following.includes(targetUid);
+  if(following){
+    await myRef.update({following: firebase.firestore.FieldValue.arrayRemove(targetUid)});
+    await tRef.update({followers: firebase.firestore.FieldValue.arrayRemove(me)});
+  }else{
+    await myRef.update({following: firebase.firestore.FieldValue.arrayUnion(targetUid)});
+    await tRef.update({followers: firebase.firestore.FieldValue.arrayUnion(me)});
+  }
 }
 
-// LOAD POSTS
-function loadPosts(){
- onSnapshot(collection(db,"posts"),(snap)=>{
-   posts.innerHTML="";
-   snap.forEach(docu=>{
-     const p = docu.data();
-     posts.innerHTML += `
-     <div class="card post">
-       <b>${p.userName}</b>
-       <p>${p.text}</p>
-       ${p.userId!==currentUser.uid
-         ? `<button onclick="toggleFollow('${p.userId}')">Follow / Unfollow</button>`
-         : ""}
-     </div>`;
-   });
- });
+/* LIKE / UNLIKE (per user) */
+async function toggleLike(postId){
+  const uid = auth.currentUser.uid;
+  const pref = db.collection("posts").doc(postId);
+  const snap = await pref.get();
+  const liked = snap.data().likes.includes(uid);
+  await pref.update({
+    likes: liked
+      ? firebase.firestore.FieldValue.arrayRemove(uid)
+      : firebase.firestore.FieldValue.arrayUnion(uid)
+  });
 }
 
-// FOLLOW / UNFOLLOW
-window.toggleFollow = async (uid)=>{
- const myRef = doc(db,"users",currentUser.uid);
- const userRef = doc(db,"users",uid);
+/* COMMENTS */
+function addComment(postId){
+  const inp = document.getElementById("c_"+postId);
+  const text = inp.value.trim();
+  if(!text) return;
+  db.collection("posts").doc(postId).collection("comments").add({
+    text,
+    uid: auth.currentUser.uid,
+    name: auth.currentUser.displayName,
+    time: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  inp.value="";
+}
 
- const mySnap = await getDoc(myRef);
- const isFollowing = mySnap.data().following.includes(uid);
-
- if(isFollowing){
-   await updateDoc(myRef,{ following:arrayRemove(uid) });
-   await updateDoc(userRef,{ followers:arrayRemove(currentUser.uid) });
- }else{
-   await updateDoc(myRef,{ following:arrayUnion(uid) });
-   await updateDoc(userRef,{ followers:arrayUnion(currentUser.uid) });
- }
- loadProfile();
+/* POSTS LISTENER */
+function listenPosts(){
+  db.collection("posts").orderBy("time","desc").onSnapshot(snap=>{
+    postsDiv.innerHTML="";
+    snap.forEach(doc=>{
+      const p = doc.data();
+      const me = auth.currentUser.uid;
+      const liked = p.likes.includes(me);
+      postsDiv.innerHTML += `
+      <div class="card post">
+        <h4>${p.name}</h4>
+        <p>${p.text}</p>
+        <div class="actions">
+          <span class="like ${liked?'active':''}" onclick="toggleLike('${doc.id}')">
+            ❤️ ${p.likes.length}
+          </span>
+          ${p.uid!==me?`<button class="btn ghost follow" onclick="toggleFollow('${p.uid}')">Follow</button>`:''}
+        </div>
+        <div>
+          <input id="c_${doc.id}" placeholder="Add a comment">
+          <button class="btn ghost" onclick="addComment('${doc.id}')">Comment</button>
+          <div id="cm_${doc.id}"></div>
+        </div>
+      </div>`;
+      // comments
+      db.collection("posts").doc(doc.id).collection("comments")
+        .orderBy("time","asc")
+        .onSnapshot(cs=>{
+          const box = document.getElementById("cm_"+doc.id);
+          box.innerHTML="";
+          cs.forEach(c=>{
+            const x=c.data();
+            box.innerHTML += `<div class="comment"><b>${x.name}:</b> ${x.text}</div>`;
+          });
+        });
+    });
+  });
 }
 </script>
 
