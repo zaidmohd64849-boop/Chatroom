@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Google Login Test</title>
+  <meta charset="UTF-8">
+</head>
+<body>
+
+  <h2>My Social Media App</h2>
+
+  <button id="googleLogin">Login with Google</button>
+
+  <p id="result"></p>
+
+  <!-- JavaScript START -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup }
+    from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+
+ const firebaseConfig = {
+  apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
+  authDomain: "chat-room-e55bf.firebaseapp.com",
+  projectId: "chat-room-e55bf",
+  storageBucket: "chat-room-e55bf.firebasestorage.app",
+  messagingSenderId: "653408545862",
+  appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    document.getElementById("googleLogin").addEventListener("click", () => {
+      signInWithPopup(auth, provider)
+        .then((result) => {
+          document.getElementById("result").innerText =
+            "Welcome " + result.user.displayName;
+        })
+        .catch((error) => {
+          document.getElementById("result").innerText =
+            "Error: " + error.message;
+        });
+    });
+  </script>
+  <!-- JavaScript END -->
+
+</body>
+</html>
