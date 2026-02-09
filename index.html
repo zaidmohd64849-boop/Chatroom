@@ -5,8 +5,16 @@
   <meta charset="UTF-8" />
   <style>
     body { font-family: Arial; padding: 15px; }
+    textarea, input { width: 100%; margin-top: 5px; }
+    button { margin-top: 5px; }
+    .post {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+    }
     .dp {
-      width: 60px; height: 60px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
       background: #4f46e5;
       color: white;
@@ -16,12 +24,19 @@
       font-size: 28px;
       margin-bottom: 10px;
     }
-    .post { border: 1px solid #ddd; padding: 10px; margin: 10px 0; }
-    button { margin-top: 5px; }
+    .comment {
+      margin-left: 10px;
+      font-size: 14px;
+    }
+    .del {
+      color: red;
+      cursor: pointer;
+      margin-left: 5px;
+    }
   </style>
 </head>
 <body>
-
+<centre>
 <h2>My Social Media App</h2>
 
 <button id="loginBtn">Login with Google</button>
@@ -33,14 +48,14 @@
   <div class="dp" id="dp"></div>
   <h3 id="userName"></h3>
 
-  <textarea id="bioInput" placeholder="Write your bio"></textarea><br>
+  <textarea id="bioInput" placeholder="Write your bio"></textarea>
   <button id="saveBio">Save Bio</button>
 </div>
 
 <hr>
 
 <div id="postSection" style="display:none;">
-  <textarea id="postText" placeholder="What's on your mind?"></textarea><br>
+  <textarea id="postText" placeholder="What's on your mind?"></textarea>
   <button id="addPost">Post</button>
 
   <h3>Posts</h3>
@@ -56,7 +71,9 @@
   } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
   import {
     getFirestore, doc, setDoc, getDoc,
-    collection, addDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove
+    collection, addDoc, onSnapshot,
+    updateDoc, arrayUnion, arrayRemove,
+    deleteDoc
   } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -71,9 +88,6 @@
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
 
-  const loginBtn = document.getElementById("loginBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
-
   loginBtn.onclick = () => signInWithPopup(auth, provider);
   logoutBtn.onclick = () => signOut(auth);
 
@@ -82,78 +96,106 @@
 
     loginBtn.style.display = "none";
     logoutBtn.style.display = "block";
-    document.getElementById("profile").style.display = "block";
-    document.getElementById("postSection").style.display = "block";
+    profile.style.display = "block";
+    postSection.style.display = "block";
 
-    document.getElementById("userName").innerText = user.displayName;
-    document.getElementById("dp").innerText = user.displayName[0].toUpperCase();
+    userName.innerText = user.displayName;
+    dp.innerText = user.displayName[0].toUpperCase();
 
     const userRef = doc(db, "users", user.uid);
     const snap = await getDoc(userRef);
-
-    if (snap.exists()) {
-      document.getElementById("bioInput").value = snap.data().bio || "";
+    if (!snap.exists()) {
+      await setDoc(userRef, { name: user.displayName, bio: "" });
     } else {
-      await setDoc(userRef, {
-        name: user.displayName,
-        bio: ""
-      });
+      bioInput.value = snap.data().bio || "";
     }
 
-    document.getElementById("saveBio").onclick = async () => {
-      await updateDoc(userRef, {
-        bio: document.getElementById("bioInput").value
-      });
+    saveBio.onclick = async () => {
+      await updateDoc(userRef, { bio: bioInput.value });
       alert("Bio saved");
     };
 
-    document.getElementById("addPost").onclick = async () => {
-      const text = document.getElementById("postText").value;
-      if (!text) return;
-
+    addPost.onclick = async () => {
+      if (!postText.value) return;
       await addDoc(collection(db, "posts"), {
-        text,
+        text: postText.value,
         userName: user.displayName,
         uid: user.uid,
         likes: 0,
         likedBy: []
       });
-      document.getElementById("postText").value = "";
+      postText.value = "";
     };
 
     onSnapshot(collection(db, "posts"), (snap) => {
-      const postsDiv = document.getElementById("posts");
-      postsDiv.innerHTML = "";
-
-      snap.forEach((docSnap) => {
-        const p = docSnap.data();
+      posts.innerHTML = "";
+      snap.forEach((d) => {
+        const p = d.data();
         const liked = p.likedBy.includes(user.uid);
 
-        postsDiv.innerHTML += `
+        posts.innerHTML += `
           <div class="post">
             <b>${p.userName}</b>
             <p>${p.text}</p>
-            <button onclick="likePost('${docSnap.id}', ${liked})">
+
+            <button onclick="likePost('${d.id}', ${liked})">
               ${liked ? "Unlike" : "Like"} (${p.likes})
             </button>
+
+            <div>
+              <input id="c-${d.id}" placeholder="Write comment" />
+              <button onclick="addComment('${d.id}')">Comment</button>
+            </div>
+
+            <div id="comments-${d.id}"></div>
           </div>
         `;
+
+        const cRef = collection(db, "posts", d.id, "comments");
+        onSnapshot(cRef, (cs) => {
+          const cDiv = document.getElementById("comments-" + d.id);
+          cDiv.innerHTML = "";
+          cs.forEach(c => {
+            const cd = c.data();
+            const delBtn = cd.uid === user.uid
+              ? `<span class="del" onclick="deleteComment('${d.id}','${c.id}')">❌</span>`
+              : "";
+
+            cDiv.innerHTML += `
+              <div class="comment">
+                💬 <b>${cd.userName}</b>: ${cd.text} ${delBtn}
+              </div>
+            `;
+          });
+        });
       });
     });
   });
 
   window.likePost = async (id, liked) => {
-    const user = auth.currentUser;
-    const ref = doc(db, "posts", id);
-
-    await updateDoc(ref, {
-      likes: liked ? -1 : 1,
-      likedBy: liked
-        ? arrayRemove(user.uid)
-        : arrayUnion(user.uid)
+    await updateDoc(doc(db, "posts", id), {
+      likedBy: liked ? arrayRemove(auth.currentUser.uid)
+                     : arrayUnion(auth.currentUser.uid),
+      likes: liked ? -1 : 1
     });
   };
-</script>
 
+  window.addComment = async (postId) => {
+    const input = document.getElementById("c-" + postId);
+    if (!input.value) return;
+
+    await addDoc(collection(db, "posts", postId, "comments"), {
+      text: input.value,
+      userName: auth.currentUser.displayName,
+      uid: auth.currentUser.uid
+    });
+    input.value = "";
+  };
+
+  window.deleteComment = async (postId, commentId) => {
+    await deleteDoc(doc(db, "posts", postId, "comments", commentId));
+  };
+</script>
+</centre>
 </body>
 </html>
