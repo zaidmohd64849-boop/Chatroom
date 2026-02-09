@@ -1,136 +1,187 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mini Social App – Chat</title>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: Arial; padding: 10px; }
-    button { margin: 3px; }
-    .user { border:1px solid #ccc; padding:5px; margin:5px 0; cursor:pointer; }
-    .chatBox {
-      border:1px solid #000;
-      height:250px;
-      overflow-y:auto;
-      padding:5px;
-      margin-top:5px;
-    }
-    .me { text-align:right; color:blue; }
-    .other { text-align:left; color:green; }
-  </style>
+<meta charset="UTF-8">
+<title>All-In-One Social App</title>
+<style>
+body{font-family:Arial;padding:10px}
+button{margin:3px}
+.post{border:1px solid #ccc;padding:8px;margin:5px 0}
+.comment{margin-left:10px;font-size:14px}
+.del{color:red;cursor:pointer}
+.user{border:1px solid #ddd;padding:5px;margin:3px;cursor:pointer}
+.chatBox{height:200px;overflow-y:auto;border:1px solid #000;padding:5px}
+.me{text-align:right;color:blue}
+.other{text-align:left;color:green}
+</style>
 </head>
 <body>
 
-<h2>Chat App</h2>
+<h2>🔥 My Social Media App</h2>
 
 <button id="loginBtn">Login with Google</button>
-<button id="logoutBtn" style="display:none;">Logout</button>
+<button id="logoutBtn" style="display:none">Logout</button>
 
 <hr>
 
-<div id="usersDiv" style="display:none;">
-  <h3>Users</h3>
-  <div id="users"></div>
+<div id="profile" style="display:none">
+<h3 id="myName"></h3>
+<textarea id="bio" placeholder="Bio"></textarea>
+<button id="saveBio">Save Bio</button>
+<p>
+Followers: <span id="f1">0</span> |
+Following: <span id="f2">0</span>
+</p>
 </div>
 
 <hr>
 
-<div id="chatDiv" style="display:none;">
-  <h3 id="chatWith"></h3>
-  <div class="chatBox" id="messages"></div>
-  <input id="msgInput" placeholder="Type message">
-  <button id="sendMsg">Send</button>
-</div>
+<h3>Users</h3>
+<div id="users"></div>
+
+<hr>
+
+<textarea id="postText" placeholder="Write post"></textarea>
+<button id="addPost">Post</button>
+<div id="posts"></div>
+
+<hr>
+
+<h3 id="chatTitle"></h3>
+<div class="chatBox" id="chat"></div>
+<input id="msg" placeholder="Message">
+<button id="send">Send</button>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import {
-  getAuth, GoogleAuthProvider,
-  signInWithPopup, signOut,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import {
-  getFirestore, doc, setDoc, getDoc,
-  collection, addDoc, onSnapshot,
-  query, orderBy, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import {getFirestore,doc,setDoc,getDoc,updateDoc,collection,addDoc,onSnapshot,deleteDoc,arrayUnion,arrayRemove,serverTimestamp,query,orderBy} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
-  authDomain: "chat-room-e55bf.firebaseapp.com",
-  projectId: "chat-room-e55bf",
-  appId: "1:653408545862:web:c3c04443d67a55f0a6ae47"
+const firebaseConfig={
+apiKey:"AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
+authDomain:"chat-room-e55bf.firebaseapp.com",
+projectId:"chat-room-e55bf",
+appId:"1:653408545862:web:c3c04443d67a55f0a6ae47"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
+const app=initializeApp(firebaseConfig);
+const auth=getAuth(app);
+const db=getFirestore(app);
+const provider=new GoogleAuthProvider();
 
-let currentChatId = "";
-let chatUserName = "";
+let chatId="";
 
-loginBtn.onclick = () => signInWithPopup(auth, provider);
-logoutBtn.onclick = () => signOut(auth);
+loginBtn.onclick=()=>signInWithPopup(auth,provider);
+logoutBtn.onclick=()=>signOut(auth);
 
-onAuthStateChanged(auth, async (user) => {
-  if (!user) return;
+onAuthStateChanged(auth,async user=>{
+if(!user)return;
 
-  loginBtn.style.display="none";
-  logoutBtn.style.display="block";
-  usersDiv.style.display="block";
+loginBtn.style.display="none";
+logoutBtn.style.display="block";
+profile.style.display="block";
 
-  await setDoc(doc(db,"users",user.uid),{
-    name:user.displayName
-  },{merge:true});
+await setDoc(doc(db,"users",user.uid),{
+name:user.displayName,
+bio:"",
+followers:[],
+following:[],
+online:true
+},{merge:true});
 
-  onSnapshot(collection(db,"users"), snap=>{
-    users.innerHTML="";
-    snap.forEach(d=>{
-      if(d.id===user.uid) return;
-      users.innerHTML+=`
-        <div class="user" onclick="openChat('${d.id}','${d.data().name}')">
-          ${d.data().name}
-        </div>`;
-    });
-  });
+myName.innerText=user.displayName;
+
+const myRef=doc(db,"users",user.uid);
+
+saveBio.onclick=()=>updateDoc(myRef,{bio:bio.value});
+
+onSnapshot(collection(db,"users"),snap=>{
+users.innerHTML="";
+snap.forEach(d=>{
+if(d.id===user.uid)return;
+const u=d.data();
+users.innerHTML+=`
+<div class="user" onclick="openChat('${d.id}','${u.name}')">
+${u.name}
+<button onclick="follow('${d.id}')">Follow</button>
+</div>`;
+});
 });
 
-window.openChat = (uid,name)=>{
-  chatDiv.style.display="block";
-  chatWith.innerText="Chat with "+name;
-  chatUserName=name;
+addPost.onclick=()=>addDoc(collection(db,"posts"),{
+text:postText.value,
+uid:user.uid,
+name:user.displayName,
+likes:0,
+likedBy:[]
+});
 
-  const me=auth.currentUser.uid;
-  currentChatId = me<uid ? me+"_"+uid : uid+"_"+me;
+onSnapshot(collection(db,"posts"),snap=>{
+posts.innerHTML="";
+snap.forEach(d=>{
+const p=d.data();
+const liked=p.likedBy.includes(user.uid);
+posts.innerHTML+=`
+<div class="post">
+<b>${p.name}</b>
+${p.uid===user.uid?`<span class="del" onclick="delPost('${d.id}')">❌</span>`:""}
+<p>${p.text}</p>
+<button onclick="like('${d.id}',${liked})">${liked?"Unlike":"Like"} (${p.likes})</button>
+<input id="c${d.id}">
+<button onclick="comment('${d.id}')">Comment</button>
+<div id="cm${d.id}"></div>
+</div>`;
+onSnapshot(collection(db,"posts",d.id,"comments"),cs=>{
+const cd=document.getElementById("cm"+d.id);
+cd.innerHTML="";
+cs.forEach(c=>{
+const x=c.data();
+cd.innerHTML+=`
+<div class="comment">
+${x.text}
+${x.uid===user.uid?`<span class="del" onclick="delComment('${d.id}','${c.id}')">❌</span>`:""}
+</div>`;
+});
+});
+});
+});
+});
 
-  const q=query(
-    collection(db,"chats",currentChatId,"messages"),
-    orderBy("time")
-  );
+window.like=(id,l)=>updateDoc(doc(db,"posts",id),{
+likedBy:l?arrayRemove(auth.currentUser.uid):arrayUnion(auth.currentUser.uid),
+likes:l?-1:1
+});
 
-  onSnapshot(q,snap=>{
-    messages.innerHTML="";
-    snap.forEach(m=>{
-      const d=m.data();
-      const cls=d.sender===me?"me":"other";
-      messages.innerHTML+=`<div class="${cls}">${d.text}</div>`;
-    });
-    messages.scrollTop=messages.scrollHeight;
-  });
+window.comment=(id)=>addDoc(collection(db,"posts",id,"comments"),{
+text:document.getElementById("c"+id).value,
+uid:auth.currentUser.uid
+});
+
+window.delComment=(p,c)=>deleteDoc(doc(db,"posts",p,"comments",c));
+window.delPost=(id)=>deleteDoc(doc(db,"posts",id));
+
+window.follow=uid=>{
+updateDoc(doc(db,"users",auth.currentUser.uid),{following:arrayUnion(uid)});
+updateDoc(doc(db,"users",uid),{followers:arrayUnion(auth.currentUser.uid)});
 };
 
-sendMsg.onclick = async ()=>{
-  if(!msgInput.value) return;
-  await addDoc(
-    collection(db,"chats",currentChatId,"messages"),
-    {
-      text:msgInput.value,
-      sender:auth.currentUser.uid,
-      time:serverTimestamp()
-    }
-  );
-  msgInput.value="";
+window.openChat=(uid,name)=>{
+chatTitle.innerText="Chat with "+name;
+const me=auth.currentUser.uid;
+chatId=me<uid?me+"_"+uid:uid+"_"+me;
+onSnapshot(query(collection(db,"chats",chatId,"msg"),orderBy("time")),s=>{
+chat.innerHTML="";
+s.forEach(m=>{
+chat.innerHTML+=`<div class="${m.data().uid===me?"me":"other"}">${m.data().text}</div>`;
+});
+});
 };
+
+send.onclick=()=>addDoc(collection(db,"chats",chatId,"msg"),{
+text:msg.value,
+uid:auth.currentUser.uid,
+time:serverTimestamp()
+});
 </script>
 
 </body>
