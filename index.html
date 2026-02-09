@@ -1,188 +1,198 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>All-In-One Social App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Social Media App</title>
+
+<!-- Google Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
 <style>
-body{font-family:Arial;padding:10px}
-button{margin:3px}
-.post{border:1px solid #ccc;padding:8px;margin:5px 0}
-.comment{margin-left:10px;font-size:14px}
-.del{color:red;cursor:pointer}
-.user{border:1px solid #ddd;padding:5px;margin:3px;cursor:pointer}
-.chatBox{height:200px;overflow-y:auto;border:1px solid #000;padding:5px}
-.me{text-align:right;color:blue}
-.other{text-align:left;color:green}
+*{
+  box-sizing:border-box;
+  font-family: 'Inter', sans-serif;
+}
+
+body{
+  margin:0;
+  background:#fafafa;
+}
+
+/* Header */
+header{
+  background:#fff;
+  border-bottom:1px solid #ddd;
+  padding:12px 16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  position:sticky;
+  top:0;
+}
+
+header h2{
+  margin:0;
+  font-size:20px;
+}
+
+header button{
+  border:none;
+  background:#efefef;
+  padding:6px 12px;
+  border-radius:6px;
+}
+
+/* Container */
+.container{
+  max-width:420px;
+  margin:auto;
+}
+
+/* Profile */
+.profile{
+  background:#fff;
+  padding:16px;
+  border-bottom:1px solid #ddd;
+}
+
+.profile-top{
+  display:flex;
+  align-items:center;
+}
+
+.dp{
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  background:#ddd;
+  margin-right:16px;
+}
+
+.stats{
+  display:flex;
+  gap:20px;
+}
+
+.stats div{
+  text-align:center;
+}
+
+.bio{
+  margin-top:10px;
+  font-size:14px;
+}
+
+/* Post box */
+.new-post{
+  background:#fff;
+  padding:12px;
+  border-bottom:1px solid #ddd;
+}
+
+.new-post input{
+  width:100%;
+  padding:10px;
+  border:1px solid #ccc;
+  border-radius:8px;
+}
+
+.new-post button{
+  margin-top:8px;
+  width:100%;
+  background:#0095f6;
+  color:white;
+  border:none;
+  padding:10px;
+  border-radius:8px;
+  font-weight:600;
+}
+
+/* Feed */
+.post{
+  background:#fff;
+  margin-top:10px;
+  border:1px solid #ddd;
+}
+
+.post-header{
+  display:flex;
+  align-items:center;
+  padding:10px;
+}
+
+.post-header .dp{
+  width:35px;
+  height:35px;
+}
+
+.post-content{
+  padding:10px;
+  font-size:14px;
+}
+
+.post-actions{
+  display:flex;
+  gap:16px;
+  padding:10px;
+}
+
+.post-actions button{
+  border:none;
+  background:none;
+  font-size:18px;
+}
 </style>
 </head>
+
 <body>
 
-<h2>🔥 My Social Media App</h2>
+<header>
+  <h2>🔥 My Social App</h2>
+  <button>Logout</button>
+</header>
 
-<button id="loginBtn">Login with Google</button>
-<button id="logoutBtn" style="display:none">Logout</button>
+<div class="container">
 
-<hr>
+  <!-- Profile -->
+  <div class="profile">
+    <div class="profile-top">
+      <div class="dp"></div>
+      <div class="stats">
+        <div><b>0</b><br>Posts</div>
+        <div><b>0</b><br>Followers</div>
+        <div><b>0</b><br>Following</div>
+      </div>
+    </div>
+    <div class="bio">
+      <b>MOHD ZAID</b><br>
+      Add your bio here ✨
+    </div>
+  </div>
 
-<div id="profile" style="display:none">
-<h3 id="myName"></h3>
-<textarea id="bio" placeholder="Bio"></textarea>
-<button id="saveBio">Save Bio</button>
-<p>
-Followers: <span id="f1">0</span> |
-Following: <span id="f2">0</span>
-</p>
+  <!-- New Post -->
+  <div class="new-post">
+    <input type="text" placeholder="What's on your mind?">
+    <button>Post</button>
+  </div>
+
+  <!-- Feed -->
+  <div class="post">
+    <div class="post-header">
+      <div class="dp"></div>
+      <b>MOHD ZAID</b>
+    </div>
+    <div class="post-content">
+      Hello 👋 This is my first post
+    </div>
+    <div class="post-actions">
+      <button>❤️</button>
+      <button>💬</button>
+      <button>📤</button>
+    </div>
+  </div>
+
 </div>
-
-<hr>
-
-<h3>Users</h3>
-<div id="users"></div>
-
-<hr>
-
-<textarea id="postText" placeholder="Write post"></textarea>
-<button id="addPost">Post</button>
-<div id="posts"></div>
-
-<hr>
-
-<h3 id="chatTitle"></h3>
-<div class="chatBox" id="chat"></div>
-<input id="msg" placeholder="Message">
-<button id="send">Send</button>
-
-<script type="module">
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import {getFirestore,doc,setDoc,getDoc,updateDoc,collection,addDoc,onSnapshot,deleteDoc,arrayUnion,arrayRemove,serverTimestamp,query,orderBy} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
-
-const firebaseConfig={
-apiKey:"AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
-authDomain:"chat-room-e55bf.firebaseapp.com",
-projectId:"chat-room-e55bf",
-appId:"1:653408545862:web:c3c04443d67a55f0a6ae47"
-};
-
-const app=initializeApp(firebaseConfig);
-const auth=getAuth(app);
-const db=getFirestore(app);
-const provider=new GoogleAuthProvider();
-
-let chatId="";
-
-loginBtn.onclick=()=>signInWithPopup(auth,provider);
-logoutBtn.onclick=()=>signOut(auth);
-
-onAuthStateChanged(auth,async user=>{
-if(!user)return;
-
-loginBtn.style.display="none";
-logoutBtn.style.display="block";
-profile.style.display="block";
-
-await setDoc(doc(db,"users",user.uid),{
-name:user.displayName,
-bio:"",
-followers:[],
-following:[],
-online:true
-},{merge:true});
-
-myName.innerText=user.displayName;
-
-const myRef=doc(db,"users",user.uid);
-
-saveBio.onclick=()=>updateDoc(myRef,{bio:bio.value});
-
-onSnapshot(collection(db,"users"),snap=>{
-users.innerHTML="";
-snap.forEach(d=>{
-if(d.id===user.uid)return;
-const u=d.data();
-users.innerHTML+=`
-<div class="user" onclick="openChat('${d.id}','${u.name}')">
-${u.name}
-<button onclick="follow('${d.id}')">Follow</button>
-</div>`;
-});
-});
-
-addPost.onclick=()=>addDoc(collection(db,"posts"),{
-text:postText.value,
-uid:user.uid,
-name:user.displayName,
-likes:0,
-likedBy:[]
-});
-
-onSnapshot(collection(db,"posts"),snap=>{
-posts.innerHTML="";
-snap.forEach(d=>{
-const p=d.data();
-const liked=p.likedBy.includes(user.uid);
-posts.innerHTML+=`
-<div class="post">
-<b>${p.name}</b>
-${p.uid===user.uid?`<span class="del" onclick="delPost('${d.id}')">❌</span>`:""}
-<p>${p.text}</p>
-<button onclick="like('${d.id}',${liked})">${liked?"Unlike":"Like"} (${p.likes})</button>
-<input id="c${d.id}">
-<button onclick="comment('${d.id}')">Comment</button>
-<div id="cm${d.id}"></div>
-</div>`;
-onSnapshot(collection(db,"posts",d.id,"comments"),cs=>{
-const cd=document.getElementById("cm"+d.id);
-cd.innerHTML="";
-cs.forEach(c=>{
-const x=c.data();
-cd.innerHTML+=`
-<div class="comment">
-${x.text}
-${x.uid===user.uid?`<span class="del" onclick="delComment('${d.id}','${c.id}')">❌</span>`:""}
-</div>`;
-});
-});
-});
-});
-});
-
-window.like=(id,l)=>updateDoc(doc(db,"posts",id),{
-likedBy:l?arrayRemove(auth.currentUser.uid):arrayUnion(auth.currentUser.uid),
-likes:l?-1:1
-});
-
-window.comment=(id)=>addDoc(collection(db,"posts",id,"comments"),{
-text:document.getElementById("c"+id).value,
-uid:auth.currentUser.uid
-});
-
-window.delComment=(p,c)=>deleteDoc(doc(db,"posts",p,"comments",c));
-window.delPost=(id)=>deleteDoc(doc(db,"posts",id));
-
-window.follow=uid=>{
-updateDoc(doc(db,"users",auth.currentUser.uid),{following:arrayUnion(uid)});
-updateDoc(doc(db,"users",uid),{followers:arrayUnion(auth.currentUser.uid)});
-};
-
-window.openChat=(uid,name)=>{
-chatTitle.innerText="Chat with "+name;
-const me=auth.currentUser.uid;
-chatId=me<uid?me+"_"+uid:uid+"_"+me;
-onSnapshot(query(collection(db,"chats",chatId,"msg"),orderBy("time")),s=>{
-chat.innerHTML="";
-s.forEach(m=>{
-chat.innerHTML+=`<div class="${m.data().uid===me?"me":"other"}">${m.data().text}</div>`;
-});
-});
-};
-
-send.onclick=()=>addDoc(collection(db,"chats",chatId,"msg"),{
-text:msg.value,
-uid:auth.currentUser.uid,
-time:serverTimestamp()
-});
-</script>
 
 </body>
 </html>
