@@ -50,155 +50,217 @@ button{padding:6px 10px;border:none;border-radius:6px;cursor:pointer}
   </div>
 
   <div id="chatBox"></div>
-
   <input id="msgInput" placeholder="Type message..." onkeydown="sendMsg(event)">
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup,
-  onAuthStateChanged, signOut
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  onAuthStateChanged,
+  signOut,
+  setPersistence,
+  browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, getDoc, getDocs,
-  collection, addDoc, onSnapshot, query, orderBy,
-  deleteDoc, serverTimestamp
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  deleteDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig={
-  apiKey:"AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
-  authDomain:"chat-room-e55bf.firebaseapp.com",
-  projectId:"chat-room-e55bf"
+const firebaseConfig = {
+  apiKey: "AIzaSyBUfFcZuhV8-vmN9TYvSoe3ZzXHvn_gZwA",
+  authDomain: "chat-room-e55bf.firebaseapp.com",
+  projectId: "chat-room-e55bf"
 };
 
-const app=initializeApp(firebaseConfig);
-const auth=getAuth(app);
-const db=getFirestore(app);
-const provider=new GoogleAuthProvider();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
 
-let me,currentFriend=null,currentChatId=null,clearedAt=null;
+// 🔥 IMPORTANT FIX FOR WEBVIEW
+await setPersistence(auth, browserLocalPersistence);
 
-onAuthStateChanged(auth,async u=>{
-  if(u){
-    me=u;
-    loginBox.style.display="none";
-    home.style.display="block";
-    await setDoc(doc(db,"users",me.uid),{name:me.displayName},{merge:true});
+let me = null;
+let currentFriend = null;
+let currentChatId = null;
+let clearedAt = null;
+
+// AUTH STATE
+onAuthStateChanged(auth, async (u) => {
+  if (u) {
+    me = u;
+    loginBox.style.display = "none";
+    home.style.display = "block";
+    chatPage.style.display = "none";
+
+    await setDoc(
+      doc(db, "users", me.uid),
+      { name: me.displayName },
+      { merge: true }
+    );
+
     loadFriends();
     loadRequests();
+  } else {
+    me = null;
+    home.style.display = "none";
+    chatPage.style.display = "none";
+    loginBox.style.display = "block";
   }
 });
 
-window.login=()=>signInWithPopup(auth,provider);
-logoutBtn.onclick=()=>signOut(auth);
+// LOGIN / LOGOUT
+window.login = () => signInWithPopup(auth, provider);
+logoutBtn.onclick = () => signOut(auth);
 
-window.searchUsers=async()=>{
-  friends.innerHTML="";
-  const q=search.value.toLowerCase();
-  if(!q) return;
-  const snap=await getDocs(collection(db,"users"));
-  snap.forEach(u=>{
-    if(u.id!==me.uid && u.data().name.toLowerCase().includes(q)){
-      friends.innerHTML+=`
-      <div class="card">
-        ${u.data().name}
-        <button onclick="sendRequest('${u.id}')">Add</button>
-      </div>`;
+// SEARCH USERS
+window.searchUsers = async () => {
+  friends.innerHTML = "";
+  const q = search.value.toLowerCase();
+  if (!q || !me) return;
+
+  const snap = await getDocs(collection(db, "users"));
+  snap.forEach(u => {
+    if (u.id !== me.uid && u.data().name?.toLowerCase().includes(q)) {
+      friends.innerHTML += `
+        <div class="card">
+          ${u.data().name}
+          <button onclick="sendRequest('${u.id}')">Add</button>
+        </div>`;
     }
   });
 };
 
-window.sendRequest=uid=>{
-  setDoc(doc(db,"requests",uid,"list",me.uid),{name:me.displayName});
+// SEND FRIEND REQUEST
+window.sendRequest = async (uid) => {
+  await setDoc(
+    doc(db, "requests", uid, "list", me.uid),
+    { name: me.displayName }
+  );
 };
 
-async function loadRequests(){
-  requests.innerHTML="";
-  const snap=await getDocs(collection(db,"requests",me.uid,"list"));
-  snap.forEach(r=>{
-    requests.innerHTML+=`
-    <div class="card">
-      ${r.data().name}
-      <button onclick="acceptRequest('${r.id}','${r.data().name}')">Accept</button>
-    </div>`;
+// LOAD REQUESTS
+async function loadRequests() {
+  requests.innerHTML = "";
+  const snap = await getDocs(collection(db, "requests", me.uid, "list"));
+  snap.forEach(r => {
+    requests.innerHTML += `
+      <div class="card">
+        ${r.data().name}
+        <button onclick="acceptRequest('${r.id}','${r.data().name}')">Accept</button>
+      </div>`;
   });
 }
 
-window.acceptRequest=async(uid,name)=>{
-  await setDoc(doc(db,"friends",me.uid,"list",uid),{name});
-  await setDoc(doc(db,"friends",uid,"list",me.uid),{name:me.displayName});
-  await deleteDoc(doc(db,"requests",me.uid,"list",uid));
-  loadFriends(); loadRequests();
+// ACCEPT REQUEST
+window.acceptRequest = async (uid, name) => {
+  await setDoc(doc(db, "friends", me.uid, "list", uid), { name });
+  await setDoc(doc(db, "friends", uid, "list", me.uid), { name: me.displayName });
+  await deleteDoc(doc(db, "requests", me.uid, "list", uid));
+  loadFriends();
+  loadRequests();
 };
 
-async function loadFriends(){
-  friends.innerHTML="";
-  const snap=await getDocs(collection(db,"friends",me.uid,"list"));
-  snap.forEach(f=>{
-    friends.innerHTML+=`
-    <div class="card user" onclick="openChat('${f.id}','${f.data().name}')">
-      ${f.data().name}
-    </div>`;
+// LOAD FRIENDS
+async function loadFriends() {
+  friends.innerHTML = "";
+  const snap = await getDocs(collection(db, "friends", me.uid, "list"));
+  snap.forEach(f => {
+    friends.innerHTML += `
+      <div class="card user" onclick="openChat('${f.id}','${f.data().name}')">
+        ${f.data().name}
+      </div>`;
   });
 }
 
-function chatId(){
-  return me.uid<currentFriend?me.uid+currentFriend:currentFriend+me.uid;
+// CHAT ID
+function chatId() {
+  return me.uid < currentFriend
+    ? me.uid + currentFriend
+    : currentFriend + me.uid;
 }
 
-window.openChat=async(uid,name)=>{
-  currentFriend=uid;
-  currentChatId=chatId();
-  chatName.innerText=name;
-  home.style.display="none";
-  chatPage.style.display="block";
+// OPEN CHAT
+window.openChat = async (uid, name) => {
+  currentFriend = uid;
+  currentChatId = chatId();
+  chatName.innerText = name;
 
-  const snap=await getDoc(doc(db,"users",me.uid,"clearedChats",currentChatId));
-  clearedAt=snap.exists()?snap.data().clearedAt:null;
+  home.style.display = "none";
+  chatPage.style.display = "block";
+
+  const snap = await getDoc(
+    doc(db, "users", me.uid, "clearedChats", currentChatId)
+  );
+  clearedAt = snap.exists() ? snap.data().clearedAt : null;
 
   loadChat();
 };
 
-window.goBack=()=>{
-  chatPage.style.display="none";
-  home.style.display="block";
+// BACK
+window.goBack = () => {
+  chatPage.style.display = "none";
+  home.style.display = "block";
 };
 
-function loadChat(){
+// LOAD CHAT
+function loadChat() {
   onSnapshot(
-    query(collection(db,"chats",currentChatId,"messages"),orderBy("time")),
-    snap=>{
-      chatBox.innerHTML="";
-      snap.forEach(m=>{
-        const msg=m.data();
-        if(clearedAt && msg.time?.toMillis()<=clearedAt.toMillis()) return;
-        chatBox.innerHTML+=`
-        <div class="msg ${msg.uid===me.uid?'me':'other'}">${msg.text}</div>`;
+    query(
+      collection(db, "chats", currentChatId, "messages"),
+      orderBy("time")
+    ),
+    snap => {
+      chatBox.innerHTML = "";
+      snap.forEach(m => {
+        const msg = m.data();
+        if (clearedAt && msg.time?.toMillis() <= clearedAt.toMillis()) return;
+        chatBox.innerHTML += `
+          <div class="msg ${msg.uid === me.uid ? "me" : "other"}">
+            ${msg.text}
+          </div>`;
       });
-      chatBox.scrollTop=chatBox.scrollHeight;
+      chatBox.scrollTop = chatBox.scrollHeight;
     }
   );
 }
 
-window.sendMsg=async e=>{
-  if(e.key==="Enter" && msgInput.value){
-    await addDoc(collection(db,"chats",currentChatId,"messages"),{
-      text:msgInput.value,
-      uid:me.uid,
-      time:serverTimestamp()
-    });
-    msgInput.value="";
+// SEND MESSAGE
+window.sendMsg = async (e) => {
+  if (e.key === "Enter" && msgInput.value && currentChatId) {
+    await addDoc(
+      collection(db, "chats", currentChatId, "messages"),
+      {
+        text: msgInput.value,
+        uid: me.uid,
+        time: serverTimestamp()
+      }
+    );
+    msgInput.value = "";
   }
 };
 
-window.clearChat=async()=>{
-  if(confirm("Clear chat? (sirf aapke liye)")){
+// CLEAR CHAT
+window.clearChat = async () => {
+  if (confirm("Clear chat? (sirf aapke liye)")) {
     await setDoc(
-      doc(db,"users",me.uid,"clearedChats",currentChatId),
-      {clearedAt:serverTimestamp()}
+      doc(db, "users", me.uid, "clearedChats", currentChatId),
+      { clearedAt: serverTimestamp() }
     );
-    chatBox.innerHTML="";
+    chatBox.innerHTML = "";
   }
 };
 </script>
