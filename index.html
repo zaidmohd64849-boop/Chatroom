@@ -18,7 +18,6 @@ button{padding:6px 10px;border:none;border-radius:6px;cursor:pointer}
 .msg{padding:8px;margin:5px 0;max-width:70%;border-radius:6px;font-size:14px}
 .me{background:#dcf8c6;margin-left:auto}
 .other{background:#fff}
-.small{font-size:12px;color:gray}
 </style>
 </head>
 
@@ -29,72 +28,42 @@ button{padding:6px 10px;border:none;border-radius:6px;cursor:pointer}
   <button class="logout" id="logoutBtn">Logout</button>
 </header>
 
-<!-- LOGIN -->
 <div class="container" id="loginBox">
   <button onclick="login()">Login with Google</button>
 </div>
 
-<!-- HOME -->
 <div class="container" id="home" style="display:none">
-  <input id="search" placeholder="Search users to add..." oninput="searchUsers()">
-
+  <input id="search" placeholder="Search users..." oninput="searchUsers()">
   <h4>Friend Requests</h4>
   <div id="requests"></div>
-
   <h4>Your Friends</h4>
   <div id="friends"></div>
 </div>
 
-<!-- CHAT -->
 <div class="container" id="chatPage" style="display:none">
-
-  <!-- CHAT HEADER -->
-  <div class="chatHeader" style="
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    background:#075e54;
-    color:white;
-    padding:10px;
-  ">
+  <div style="display:flex;justify-content:space-between;background:#075e54;color:white;padding:10px">
+    <b id="chatName"></b>
     <div>
-      <div id="chatName"></div>
-      <small id="status"></small>
-    </div>
-
-    <div>
-      <button onclick="clearChat()" style="
-        background:#075e54;
-        color:white;
-        border:none;
-        margin-right:6px;
-      ">Clear</button>
-
-      <button onclick="goBack()" style="
-        background:#075e54;
-        color:white;
-        border:none;
-      ">⬅</button>
+      <button onclick="clearChat()" style="background:#075e54;color:white">Clear</button>
+      <button onclick="goBack()" style="background:#075e54;color:white">⬅</button>
     </div>
   </div>
 
-  <!-- MESSAGES -->
-  <div id="chatBox" style="padding:10px;"></div>
+  <div id="chatBox"></div>
 
-  <!-- INPUT -->
-  <input id="msgInput"
-         placeholder="Type message..."
-         onkeydown="sendMsg(event)"
-         style="width:100%;padding:10px;">
+  <input id="msgInput" placeholder="Type message..." onkeydown="sendMsg(event)">
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup,
+  onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, getDocs,
-  collection, addDoc, onSnapshot, query, orderBy, deleteDoc
+  collection, addDoc, onSnapshot, query, orderBy,
+  deleteDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig={
@@ -108,20 +77,14 @@ const auth=getAuth(app);
 const db=getFirestore(app);
 const provider=new GoogleAuthProvider();
 
-let me,currentFriend=null;
+let me,currentFriend=null,currentChatId=null,clearedAt=null;
 
-// AUTH
 onAuthStateChanged(auth,async u=>{
   if(u){
     me=u;
     loginBox.style.display="none";
     home.style.display="block";
-
-    await setDoc(doc(db,"users",me.uid),{
-      name:me.displayName,
-      email:me.email
-    },{merge:true});
-
+    await setDoc(doc(db,"users",me.uid),{name:me.displayName},{merge:true});
     loadFriends();
     loadRequests();
   }
@@ -130,85 +93,70 @@ onAuthStateChanged(auth,async u=>{
 window.login=()=>signInWithPopup(auth,provider);
 logoutBtn.onclick=()=>signOut(auth);
 
-//// FRIEND SYSTEM ///////
-
-// SEARCH USERS (ADD FRIEND REQUEST)
-window.searchUsers = async ()=>{
-  const q = search.value.toLowerCase();
+window.searchUsers=async()=>{
   friends.innerHTML="";
+  const q=search.value.toLowerCase();
   if(!q) return;
-
-  const snap = await getDocs(collection(db,"users"));
+  const snap=await getDocs(collection(db,"users"));
   snap.forEach(u=>{
-    if(u.id===me.uid) return;
-    if(u.data().name.toLowerCase().includes(q)){
+    if(u.id!==me.uid && u.data().name.toLowerCase().includes(q)){
       friends.innerHTML+=`
-        <div class="card">
-          <b>${u.data().name}</b>
-          <button onclick="sendRequest('${u.id}','${u.data().name}')">Add</button>
-        </div>`;
+      <div class="card">
+        ${u.data().name}
+        <button onclick="sendRequest('${u.id}')">Add</button>
+      </div>`;
     }
   });
 };
 
-// SEND REQUEST
-window.sendRequest = async (uid,name)=>{
-  await setDoc(doc(db,"requests",uid,"list",me.uid),{
-    name:me.displayName
-  });
-  alert("Request sent");
-  search.value="";
+window.sendRequest=uid=>{
+  setDoc(doc(db,"requests",uid,"list",me.uid),{name:me.displayName});
 };
 
-// LOAD REQUESTS
 async function loadRequests(){
   requests.innerHTML="";
-  const snap = await getDocs(collection(db,"requests",me.uid,"list"));
+  const snap=await getDocs(collection(db,"requests",me.uid,"list"));
   snap.forEach(r=>{
     requests.innerHTML+=`
-      <div class="card">
-        <b>${r.data().name}</b>
-        <button onclick="acceptRequest('${r.id}','${r.data().name}')">
-          Accept
-        </button>
-      </div>`;
+    <div class="card">
+      ${r.data().name}
+      <button onclick="acceptRequest('${r.id}','${r.data().name}')">Accept</button>
+    </div>`;
   });
 }
 
-// ACCEPT REQUEST
-window.acceptRequest = async (uid,name)=>{
+window.acceptRequest=async(uid,name)=>{
   await setDoc(doc(db,"friends",me.uid,"list",uid),{name});
   await setDoc(doc(db,"friends",uid,"list",me.uid),{name:me.displayName});
   await deleteDoc(doc(db,"requests",me.uid,"list",uid));
-  loadFriends();
-  loadRequests();
+  loadFriends(); loadRequests();
 };
 
-// LOAD FRIENDS
 async function loadFriends(){
   friends.innerHTML="";
-  const snap = await getDocs(collection(db,"friends",me.uid,"list"));
+  const snap=await getDocs(collection(db,"friends",me.uid,"list"));
   snap.forEach(f=>{
     friends.innerHTML+=`
-      <div class="card user" onclick="openChat('${f.id}')">
-        <b>${f.data().name}</b>
-      </div>`;
+    <div class="card user" onclick="openChat('${f.id}','${f.data().name}')">
+      ${f.data().name}
+    </div>`;
   });
 }
-
-//// CHAT ///////
 
 function chatId(){
   return me.uid<currentFriend?me.uid+currentFriend:currentFriend+me.uid;
 }
 
-window.openChat = async uid=>{
-  const f = await getDoc(doc(db,"friends",me.uid,"list",uid));
-  if(!f.exists()) return alert("Add friend first");
-
+window.openChat=async(uid,name)=>{
   currentFriend=uid;
+  currentChatId=chatId();
+  chatName.innerText=name;
   home.style.display="none";
   chatPage.style.display="block";
+
+  const snap=await getDoc(doc(db,"users",me.uid,"clearedChats",currentChatId));
+  clearedAt=snap.exists()?snap.data().clearedAt:null;
+
   loadChat();
 };
 
@@ -219,50 +167,38 @@ window.goBack=()=>{
 
 function loadChat(){
   onSnapshot(
-    query(collection(db,"chats",chatId(),"messages"),orderBy("time")),
+    query(collection(db,"chats",currentChatId,"messages"),orderBy("time")),
     snap=>{
       chatBox.innerHTML="";
       snap.forEach(m=>{
-  const msg = m.data();
-
-  // 👇 CLEAR CHAT FILTER (YAHI MAIN LINE HAI)
-  if (clearedAt && msg.time && msg.time.toMillis() <= clearedAt.toMillis()) {
-    return; // purana message skip
-  }
-
-  chatBox.innerHTML+=`
-    <div class="msg ${msg.uid===me.uid?'me':'other'}">
-      ${msg.text}
-    </div>`;
-});
+        const msg=m.data();
+        if(clearedAt && msg.time?.toMillis()<=clearedAt.toMillis()) return;
+        chatBox.innerHTML+=`
+        <div class="msg ${msg.uid===me.uid?'me':'other'}">${msg.text}</div>`;
+      });
       chatBox.scrollTop=chatBox.scrollHeight;
     }
   );
 }
 
-window.sendMsg = async e=>{
+window.sendMsg=async e=>{
   if(e.key==="Enter" && msgInput.value){
-    await addDoc(collection(db,"chats",chatId(),"messages"),{
+    await addDoc(collection(db,"chats",currentChatId,"messages"),{
       text:msgInput.value,
       uid:me.uid,
-      time:Date.now()
+      time:serverTimestamp()
     });
     msgInput.value="";
   }
 };
-import { doc, setDoc, serverTimestamp, getDoc }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-window.clearChat = async () => {
-  if (!currentChatId) return;
-
-  if (confirm("Clear chat? (sirf aapke liye)")) {
+window.clearChat=async()=>{
+  if(confirm("Clear chat? (sirf aapke liye)")){
     await setDoc(
-      doc(db, "users", me.uid, "clearedChats", currentChatId),
-      { clearedAt: serverTimestamp() }
+      doc(db,"users",me.uid,"clearedChats",currentChatId),
+      {clearedAt:serverTimestamp()}
     );
-
-    document.getElementById("chatBox").innerHTML = "";
+    chatBox.innerHTML="";
   }
 };
 </script>
