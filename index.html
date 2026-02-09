@@ -18,19 +18,37 @@ body{
   overflow:hidden;
 }
 
+/* HEADER */
 header{
   background:#075e54;
   color:white;
   padding:10px;
   display:flex;
-  align-items:center;
   justify-content:space-between;
+  align-items:center;
 }
 
+/* LOGIN */
+#login{
+  display:flex;
+  height:100vh;
+  justify-content:center;
+  align-items:center;
+}
+#login button{
+  background:#25d366;
+  border:none;
+  color:white;
+  padding:14px 20px;
+  font-size:16px;
+  border-radius:30px;
+}
+
+/* MAIN */
 .container{
   padding:10px;
   overflow-y:auto;
-  height:calc(100vh - 110px);
+  height:calc(100vh - 60px);
 }
 
 .user{
@@ -44,6 +62,7 @@ header{
 .name{font-weight:600}
 .status{font-size:12px;color:gray}
 
+/* SEARCH */
 #search{
   width:100%;
   padding:10px;
@@ -52,6 +71,7 @@ header{
   margin-bottom:10px;
 }
 
+/* CHAT */
 #chat{
   display:none;
   flex-direction:column;
@@ -101,28 +121,30 @@ header{
   border-radius:20px;
   margin-left:6px;
 }
-
-#typing{
-  font-size:12px;
-  color:#d0f0e0;
-}
 </style>
 </head>
 
 <body>
 
+<!-- LOGIN SCREEN -->
+<div id="login">
+  <button onclick="login()">Login with Google</button>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+
 <header>
-  <span onclick="closeChat()">⬅</span>
-  <div>
-    <div id="chatName">Chats</div>
-    <div id="typing"></div>
-  </div>
+  <b>WhatsApp Clone</b>
+  <button onclick="logout()" style="background:white;color:#075e54;border:none;border-radius:20px;padding:6px 12px">
+    Logout
+  </button>
 </header>
 
 <div id="main" class="container">
 
   <!-- SEARCH -->
-  <input id="search" placeholder="Search or add friend..." oninput="searchUser()">
+  <input id="search" placeholder="Search friend..." oninput="searchUser()">
 
   <!-- STATUS -->
   <div class="user" onclick="addStatus()">
@@ -144,10 +166,14 @@ header{
   </div>
 </div>
 
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } 
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { 
+  getAuth, GoogleAuthProvider,
+  signInWithPopup, signOut, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
   getFirestore, doc, setDoc, getDocs, collection,
   addDoc, onSnapshot, serverTimestamp, updateDoc 
@@ -159,30 +185,52 @@ const firebaseConfig = {
   projectId: "chat-room-e55bf"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const appFirebase = initializeApp(firebaseConfig);
+const auth = getAuth(appFirebase);
+const db = getFirestore(appFirebase);
 const provider = new GoogleAuthProvider();
 
-let me, chatId, allUsers=[];
+let me, allUsers=[], chatId;
 
-// LOGIN
-onAuthStateChanged(auth, async(user)=>{
-  if(!user) await signInWithPopup(auth,provider);
-  else{
+// AUTH STATE
+onAuthStateChanged(auth,(user)=>{
+  if(user){
     me=user;
+    login.style.display="none";
+    app.style.display="block";
+    saveUser();
     loadUsers();
     loadStatus();
+  }else{
+    app.style.display="none";
+    login.style.display="flex";
   }
 });
 
-// LOAD USERS
+// LOGIN
+window.login = async()=>{
+  await signInWithPopup(auth,provider);
+};
+
+// LOGOUT
+window.logout = async()=>{
+  await signOut(auth);
+};
+
+// SAVE USER
+async function saveUser(){
+  await setDoc(doc(db,"users",me.uid),{
+    name:me.displayName,
+    email:me.email
+  },{merge:true});
+}
+
+// USERS
 async function loadUsers(){
   const snap=await getDocs(collection(db,"users"));
   allUsers=[];
   snap.forEach(u=>{
-    if(u.id!==me.uid)
-      allUsers.push({id:u.id,...u.data()});
+    if(u.id!==me.uid) allUsers.push({id:u.id,...u.data()});
   });
   renderUsers(allUsers);
 }
@@ -197,11 +245,9 @@ function renderUsers(list){
   });
 }
 
-// SEARCH FRIEND
 window.searchUser=()=>{
   const q=search.value.toLowerCase();
-  const filtered=allUsers.filter(u=>u.name.toLowerCase().includes(q));
-  renderUsers(filtered);
+  renderUsers(allUsers.filter(u=>u.name.toLowerCase().includes(q)));
 };
 
 // STATUS
@@ -231,18 +277,11 @@ function loadStatus(){
 // CHAT
 window.openChat=(uid,name)=>{
   chatId=[me.uid,uid].sort().join("_");
-  chatName.innerText=name;
   main.style.display="none";
   chat.style.display="flex";
   listenMessages();
 };
 
-window.closeChat=()=>{
-  chat.style.display="none";
-  main.style.display="block";
-};
-
-// SEND
 window.sendMsg=async()=>{
   if(!msgInput.value) return;
   await addDoc(collection(db,"chats",chatId,"messages"),{
@@ -253,7 +292,6 @@ window.sendMsg=async()=>{
   msgInput.value="";
 };
 
-// LISTEN MSG
 function listenMessages(){
   onSnapshot(collection(db,"chats",chatId,"messages"),snap=>{
     messages.innerHTML="";
