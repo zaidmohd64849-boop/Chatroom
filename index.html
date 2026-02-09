@@ -11,7 +11,7 @@ header{background:#075e54;color:#fff;padding:12px;display:flex;justify-content:s
 .container{padding:10px}
 .card{background:#fff;padding:12px;margin-bottom:8px;border-radius:8px}
 input{width:100%;padding:10px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box}
-button{padding:8px 12px;border:none;border-radius:6px;cursor:pointer}
+button{padding:6px 10px;border:none;border-radius:6px;cursor:pointer}
 .logout{background:#fff;color:#075e54}
 .user{cursor:pointer}
 #chatBox{height:55vh;overflow-y:auto;background:#efeae2;padding:10px}
@@ -29,26 +29,27 @@ button{padding:8px 12px;border:none;border-radius:6px;cursor:pointer}
   <button class="logout" id="logoutBtn">Logout</button>
 </header>
 
+<!-- LOGIN -->
 <div class="container" id="loginBox">
   <button onclick="login()">Login with Google</button>
 </div>
 
+<!-- HOME -->
 <div class="container" id="home" style="display:none">
-  <input id="search" placeholder="Search friend..." oninput="filterUsers()">
-  <div class="card" onclick="addStatus()">➕ My Status<div class="small">Tap to add status</div></div>
-  <div id="users"></div>
+  <input id="search" placeholder="Search users to add..." oninput="searchUsers()">
+
+  <h4>Friend Requests</h4>
+  <div id="requests"></div>
+
+  <h4>Your Friends</h4>
+  <div id="friends"></div>
 </div>
 
+<!-- CHAT -->
 <div class="container" id="chatPage" style="display:none">
   <button onclick="goBack()">⬅ Back</button>
-  <button onclick="clearChatMe()">Clear for me</button>
-  <button onclick="clearChatAll()">Clear for everyone</button>
-  <div id="typing" class="small"></div>
   <div id="chatBox"></div>
-  <input id="msgInput" placeholder="Type message..."
-    onkeydown="sendMsg(event)"
-    oninput="typingStatus(true)"
-    onblur="typingStatus(false)">
+  <input id="msgInput" placeholder="Type message..." onkeydown="sendMsg(event)">
 </div>
 
 <script type="module">
@@ -56,7 +57,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, getDocs, getDoc,
+  getFirestore, doc, setDoc, getDoc, getDocs,
   collection, addDoc, onSnapshot, query, orderBy, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -71,7 +72,7 @@ const auth=getAuth(app);
 const db=getFirestore(app);
 const provider=new GoogleAuthProvider();
 
-let me,currentFriend=null,typingRef;
+let me,currentFriend=null;
 
 // AUTH
 onAuthStateChanged(auth,async u=>{
@@ -79,44 +80,96 @@ onAuthStateChanged(auth,async u=>{
     me=u;
     loginBox.style.display="none";
     home.style.display="block";
+
     await setDoc(doc(db,"users",me.uid),{
       name:me.displayName,
-      email:me.email,
-      lastSeen:Date.now()
+      email:me.email
     },{merge:true});
-    loadUsers();
+
+    loadFriends();
+    loadRequests();
   }
 });
 
 window.login=()=>signInWithPopup(auth,provider);
 logoutBtn.onclick=()=>signOut(auth);
 
-// USERS
-async function loadUsers(){
-  const snap=await getDocs(collection(db,"users"));
-  users.innerHTML="";
+//// FRIEND SYSTEM ///////
+
+// SEARCH USERS (ADD FRIEND REQUEST)
+window.searchUsers = async ()=>{
+  const q = search.value.toLowerCase();
+  friends.innerHTML="";
+  if(!q) return;
+
+  const snap = await getDocs(collection(db,"users"));
   snap.forEach(u=>{
     if(u.id===me.uid) return;
-    users.innerHTML+=`
-      <div class="card user" onclick="openChat('${u.id}')">
-        <b>${u.data().name}</b>
+    if(u.data().name.toLowerCase().includes(q)){
+      friends.innerHTML+=`
+        <div class="card">
+          <b>${u.data().name}</b>
+          <button onclick="sendRequest('${u.id}','${u.data().name}')">Add</button>
+        </div>`;
+    }
+  });
+};
+
+// SEND REQUEST
+window.sendRequest = async (uid,name)=>{
+  await setDoc(doc(db,"requests",uid,"list",me.uid),{
+    name:me.displayName
+  });
+  alert("Request sent");
+  search.value="";
+};
+
+// LOAD REQUESTS
+async function loadRequests(){
+  requests.innerHTML="";
+  const snap = await getDocs(collection(db,"requests",me.uid,"list"));
+  snap.forEach(r=>{
+    requests.innerHTML+=`
+      <div class="card">
+        <b>${r.data().name}</b>
+        <button onclick="acceptRequest('${r.id}','${r.data().name}')">
+          Accept
+        </button>
       </div>`;
   });
 }
 
-window.filterUsers=()=>{
-  const q=search.value.toLowerCase();
-  [...users.children].forEach(c=>{
-    c.style.display=c.innerText.toLowerCase().includes(q)?"block":"none";
-  });
+// ACCEPT REQUEST
+window.acceptRequest = async (uid,name)=>{
+  await setDoc(doc(db,"friends",me.uid,"list",uid),{name});
+  await setDoc(doc(db,"friends",uid,"list",me.uid),{name:me.displayName});
+  await deleteDoc(doc(db,"requests",me.uid,"list",uid));
+  loadFriends();
+  loadRequests();
 };
 
-// CHAT
+// LOAD FRIENDS
+async function loadFriends(){
+  friends.innerHTML="";
+  const snap = await getDocs(collection(db,"friends",me.uid,"list"));
+  snap.forEach(f=>{
+    friends.innerHTML+=`
+      <div class="card user" onclick="openChat('${f.id}')">
+        <b>${f.data().name}</b>
+      </div>`;
+  });
+}
+
+//// CHAT ///////
+
 function chatId(){
   return me.uid<currentFriend?me.uid+currentFriend:currentFriend+me.uid;
 }
 
-window.openChat=uid=>{
+window.openChat = async uid=>{
+  const f = await getDoc(doc(db,"friends",me.uid,"list",uid));
+  if(!f.exists()) return alert("Add friend first");
+
   currentFriend=uid;
   home.style.display="none";
   chatPage.style.display="block";
@@ -128,77 +181,31 @@ window.goBack=()=>{
   home.style.display="block";
 };
 
-// LOAD CHAT
 function loadChat(){
   onSnapshot(
     query(collection(db,"chats",chatId(),"messages"),orderBy("time")),
     snap=>{
       chatBox.innerHTML="";
       snap.forEach(m=>{
-        if(m.data().deletedFor===me.uid) return;
         chatBox.innerHTML+=`
           <div class="msg ${m.data().uid===me.uid?'me':'other'}">
             ${m.data().text}
-            <div class="small">
-              ${m.data().uid===me.uid?(m.data().seen?'Seen':'Delivered'):''}
-            </div>
           </div>`;
       });
       chatBox.scrollTop=chatBox.scrollHeight;
     }
   );
-
-  onSnapshot(doc(db,"typing",chatId()),s=>{
-    if(s.exists() && s.data().uid!==me.uid && s.data().typing)
-      typing.innerText="typing...";
-    else typing.innerText="";
-  });
 }
 
-// SEND
-window.sendMsg=async e=>{
+window.sendMsg = async e=>{
   if(e.key==="Enter" && msgInput.value){
     await addDoc(collection(db,"chats",chatId(),"messages"),{
       text:msgInput.value,
       uid:me.uid,
-      time:Date.now(),
-      seen:false
+      time:Date.now()
     });
     msgInput.value="";
-    typingStatus(false);
   }
-};
-
-// TYPING
-window.typingStatus=async state=>{
-  if(!currentFriend) return;
-  typingRef=doc(db,"typing",chatId());
-  await setDoc(typingRef,{uid:me.uid,typing:state});
-};
-
-// CLEAR CHAT
-window.clearChatMe=async()=>{
-  const snap=await getDocs(collection(db,"chats",chatId(),"messages"));
-  snap.forEach(async m=>{
-    await setDoc(doc(db,"chats",chatId(),"messages",m.id),
-      {deletedFor:me.uid},{merge:true});
-  });
-};
-
-window.clearChatAll=async()=>{
-  const snap=await getDocs(collection(db,"chats",chatId(),"messages"));
-  snap.forEach(async m=>{
-    await deleteDoc(doc(db,"chats",chatId(),"messages",m.id));
-  });
-};
-
-// STATUS
-window.addStatus=async()=>{
-  const t=prompt("Enter status");
-  if(!t) return;
-  await setDoc(doc(db,"status",me.uid),{
-    text:t,time:Date.now(),name:me.displayName
-  });
 };
 </script>
 
