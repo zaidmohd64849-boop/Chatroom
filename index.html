@@ -201,6 +201,9 @@ window.clearChat=async()=>{
     chatBox.innerHTML="";
   }
 };
+  if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+  }
 </script>
 
 </body>
