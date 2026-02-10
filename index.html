@@ -4,9 +4,50 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chatroom</title>
+
 <link rel="manifest" href="manifest.json">
+
 <style>
 body{margin:0;font-family:Arial;background:#ece5dd}
+
+/* ===== WELCOME UI ===== */
+#welcome{
+  height:100vh;
+  background:#06c6f2;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:space-evenly;
+  font-family:cursive;
+  text-align:center;
+}
+
+.topLogo{
+  width:60px;
+  position:absolute;
+  top:20px;
+  left:20px;
+}
+
+#welcome h1{
+  font-size:42px;
+  margin:0;
+}
+
+.centerImg{
+  width:140px;
+}
+
+#loginBtn{
+  background:none;
+  border:none;
+  font-size:32px;
+  color:red;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+/* ===== CHAT UI (UNCHANGED) ===== */
 header{background:#075e54;color:#fff;padding:12px;display:flex;justify-content:space-between;align-items:center}
 .container{padding:10px}
 .card{background:#fff;padding:12px;margin-bottom:8px;border-radius:8px}
@@ -23,14 +64,19 @@ button{padding:6px 10px;border:none;border-radius:6px;cursor:pointer}
 
 <body>
 
-<header>
+<!-- ===== WELCOME SCREEN ===== -->
+<div id="welcome">
+  <img src="icon-192.png" class="topLogo">
+  <h1>Welcome to<br>chatroom</h1>
+  <img src="logo.png" class="centerImg">
+  <button id="loginBtn">Login to Google</button>
+</div>
+
+<!-- ===== CHAT APP ===== -->
+<header style="display:none" id="appHeader">
   <b>Chat App</b>
   <button class="logout" id="logoutBtn">Logout</button>
 </header>
-
-<div class="container" id="loginBox">
-  <button onclick="login()">Login with Google</button>
-</div>
 
 <div class="container" id="home" style="display:none">
   <input id="search" placeholder="Search users..." oninput="searchUsers()">
@@ -50,7 +96,6 @@ button{padding:6px 10px;border:none;border-radius:6px;cursor:pointer}
   </div>
 
   <div id="chatBox"></div>
-
   <input id="msgInput" placeholder="Type message..." onkeydown="sendMsg(event)">
 </div>
 
@@ -79,20 +124,25 @@ const provider=new GoogleAuthProvider();
 
 let me,currentFriend=null,currentChatId=null,clearedAt=null;
 
+/* ===== AUTH STATE ===== */
 onAuthStateChanged(auth,async u=>{
   if(u){
     me=u;
-    loginBox.style.display="none";
+    welcome.style.display="none";
+    appHeader.style.display="flex";
     home.style.display="block";
+
     await setDoc(doc(db,"users",me.uid),{name:me.displayName},{merge:true});
     loadFriends();
     loadRequests();
   }
 });
 
-window.login=()=>signInWithPopup(auth,provider);
+/* ===== LOGIN / LOGOUT ===== */
+loginBtn.onclick=()=>signInWithPopup(auth,provider);
 logoutBtn.onclick=()=>signOut(auth);
 
+/* ===== REST CHAT CODE (UNCHANGED) ===== */
 window.searchUsers=async()=>{
   friends.innerHTML="";
   const q=search.value.toLowerCase();
@@ -201,9 +251,11 @@ window.clearChat=async()=>{
     chatBox.innerHTML="";
   }
 };
-  if ("serviceWorker" in navigator) {
+
+/* ===== SERVICE WORKER ===== */
+if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("service-worker.js");
-  }
+}
 </script>
 
 </body>
