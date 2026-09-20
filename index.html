@@ -1,1 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
 
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="theme-color"
+    content="#075E54"
+  >
+
+  <meta
+    name="description"
+    content="Firebase Real-Time ChatRoom"
+  >
+
+  <title>ChatRoom</title>
+
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- =========================================
+       LOGIN / SIGNUP SCREEN
+  ========================================== -->
+
+  <div id="authScreen" class="screen">
+
+    <div class="auth-card">
+
+      <div class="logo">
+        💬
+      </div>
+
+      <h1>ChatRoom</h1>
+
+      <p class="muted">
+        Real-time messaging
+      </p>
+
+      <!-- Login / Signup tabs -->
+      <div class="tabs">
+
+        <button
+          id="loginTab"
+          class="tab active"
+          type="button"
+        >
+          Login
+        </button>
+
+        <button
+          id="signupTab"
+          class="tab"
+          type="button"
+        >
+          Create account
+        </button>
+
+      </div>
+
+      <!-- Authentication form -->
+      <form id="authForm">
+
+        <!-- Name - only shown during signup -->
+        <input
+          id="nameInput"
+          class="hidden"
+          type="text"
+          placeholder="Your name"
+          maxlength="30"
+          autocomplete="name"
+        >
+
+        <!-- Email -->
+        <input
+          id="emailInput"
+          type="email"
+          placeholder="Email address"
+          autocomplete="email"
+          required
+        >
+
+        <!-- Password -->
+        <input
+          id="passwordInput"
+          type="password"
+          placeholder="Password (minimum 6 characters)"
+          autocomplete="current-password"
+          minlength="6"
+          required
+        >
+
+        <!-- Login / Signup button -->
+        <button
+          id="authBtn"
+          class="primary"
+          type="submit"
+        >
+          Login
+        </button>
+
+      </form>
+
+      <!-- Firebase error message -->
+      <div
+        id="authError"
+        class="error"
+        aria-live="polite"
+      ></div>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================================
+       MAIN CHAT APPLICATION
+  ========================================== -->
+
+  <div
+    id="appScreen"
+    class="app hidden"
+  >
+
+    <!-- =======================================
+         LEFT SIDEBAR
+    ======================================== -->
+
+    <aside class="sidebar">
+
+      <!-- Sidebar header -->
+      <header class="side-header">
+
+        <div class="brand">
+          ChatRoom
+        </div>
+
+        <button
+          id="logoutBtn"
+          class="icon-btn"
+          type="button"
+          title="Logout"
+          aria-label="Logout"
+        >
+          ↪
+        </button>
+
+      </header>
+
+
+      <!-- Current user profile -->
+      <div class="profile-mini">
+
+        <div
+          id="myAvatar"
+          class="avatar"
+        >
+          U
+        </div>
+
+        <div>
+
+          <strong id="myName">
+            User
+          </strong>
+
+          <div class="muted">
+            Online
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- Search users -->
+      <div class="search-wrap">
+
+        <input
+          id="userSearch"
+          type="search"
+          placeholder="Search people..."
+          autocomplete="off"
+        >
+
+      </div>
+
+
+      <!-- =====================================
+           PUBLIC CHAT ROOM
+      ====================================== -->
+
+      <div
+        class="room-item active"
+        data-chat="public"
+      >
+
+        <div class="avatar room-avatar">
+          🌐
+        </div>
+
+        <div class="room-text">
+
+          <strong>
+            Public Chat
+          </strong>
+
+          <span>
+            Everyone can join
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <!-- Users heading -->
+      <div class="section-title">
+        People
+      </div>
+
+
+      <!-- Firebase users will appear here -->
+      <div
+        id="userList"
+        class="user-list"
+      ></div>
+
+    </aside>
+
+
+    <!-- =======================================
+         CHAT AREA
+    ======================================== -->
+
+    <main class="chat">
+
+      <!-- Chat header -->
+      <header class="chat-header">
+
+        <!-- Mobile back button -->
+        <button
+          id="backBtn"
+          class="back-btn"
+          type="button"
+          aria-label="Back"
+        >
+          ‹
+        </button>
+
+
+        <!-- Chat avatar -->
+        <div
+          id="chatAvatar"
+          class="avatar room-avatar"
+        >
+          🌐
+        </div>
+
+
+        <!-- Chat information -->
+        <div class="chat-title">
+
+          <strong id="chatName">
+            Public Chat
+          </strong>
+
+          <span id="chatStatus">
+            Everyone can join
+          </span>
+
+        </div>
+
+      </header>
+
+
+      <!-- =====================================
+           MESSAGES
+      ====================================== -->
+
+      <section
+        id="messages"
+        class="messages"
+        aria-live="polite"
+      ></section>
+
+
+      <!-- Typing indicator -->
+      <div
+        id="typing"
+        class="typing"
+      ></div>
+
+
+      <!-- =====================================
+           MESSAGE COMPOSER
+      ====================================== -->
+
+      <form
+        id="messageForm"
+        class="composer"
+      >
+
+        <input
+          id="messageInput"
+          type="text"
+          maxlength="1000"
+          autocomplete="off"
+          placeholder="Type a message..."
+          required
+        >
+
+        <button
+          type="submit"
+          class="send-btn"
+          title="Send message"
+          aria-label="Send message"
+        >
+          ➤
+        </button>
+
+      </form>
+
+    </main>
+
+  </div>
+
+
+  <!-- =========================================
+       TOAST / NOTIFICATION
+  ========================================== -->
+
+  <div
+    id="toast"
+    class="toast"
+    role="status"
+    aria-live="polite"
+  ></div>
+
+
+  <!-- =========================================
+       FIREBASE + APPLICATION JAVASCRIPT
+
+       app.js में Firebase configuration और
+       पूरा chat logic रहेगा।
+  ========================================== -->
+
+  <script
+    type="module"
+    src="app.js"
+  ></script>
+
+</body>
+</html>
