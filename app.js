@@ -1,6 +1,12 @@
 /* =========================================================
    FIREBASE CHATROOM
-   Authentication + Firestore Chat + Online Presence
+   Authentication + Firestore Chat + Realtime Presence
+   Public Chat + Private Chat + Typing Indicator
+========================================================= */
+
+
+/* =========================================================
+   1. FIREBASE IMPORTS
 ========================================================= */
 
 import { initializeApp } from
@@ -42,13 +48,13 @@ import {
 
 
 /* =========================================================
-   1. FIREBASE CONFIG
-=========================================================
+   2. FIREBASE CONFIG
+========================================================= */
 
-   // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCsImFYpdYejQHaMEsERqCVK2TX0bMkJTU",
   authDomain: "chatroom-78015.firebaseapp.com",
+  databaseURL: "https://chatroom-78015-default-rtdb.firebaseio.com",
   projectId: "chatroom-78015",
   storageBucket: "chatroom-78015.firebasestorage.app",
   messagingSenderId: "135624570705",
@@ -58,7 +64,7 @@ const firebaseConfig = {
 
 
 /* =========================================================
-   2. INITIALIZE FIREBASE
+   3. INITIALIZE FIREBASE
 ========================================================= */
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -71,69 +77,55 @@ const rtdb = getDatabase(firebaseApp);
 
 
 /* =========================================================
-   3. HELPER
+   4. HELPER
 ========================================================= */
 
-const $ = (id) => {
-  return document.getElementById(id);
-};
+const $ = (id) => document.getElementById(id);
 
 
 /* =========================================================
-   4. DOM ELEMENTS
+   5. DOM ELEMENTS
 ========================================================= */
 
 const authScreen = $("authScreen");
-
 const appScreen = $("appScreen");
 
 const authForm = $("authForm");
-
 const authBtn = $("authBtn");
-
 const authError = $("authError");
 
 const nameInput = $("nameInput");
-
 const emailInput = $("emailInput");
-
 const passwordInput = $("passwordInput");
 
 const loginTab = $("loginTab");
-
 const signupTab = $("signupTab");
 
 const logoutBtn = $("logoutBtn");
 
 const myAvatar = $("myAvatar");
-
 const myName = $("myName");
 
 const userSearch = $("userSearch");
-
 const userList = $("userList");
 
 const backBtn = $("backBtn");
 
 const chatAvatar = $("chatAvatar");
-
 const chatName = $("chatName");
-
 const chatStatus = $("chatStatus");
 
 const messagesEl = $("messages");
-
 const typingEl = $("typing");
 
 const messageForm = $("messageForm");
-
 const messageInput = $("messageInput");
 
 const toast = $("toast");
 
 
 /* =========================================================
-   5. APPLICATION STATE
+   6. APPLICATION STATE
 ========================================================= */
 
 let authMode = "login";
@@ -158,11 +150,15 @@ let unsubscribeUsers = null;
 
 let unsubscribePresence = null;
 
+let unsubscribeTyping = null;
+
 let typingTimer = null;
+
+let isSendingMessage = false;
 
 
 /* =========================================================
-   6. AUTH MODE
+   7. AUTH MODE
 ========================================================= */
 
 function setAuthMode(mode) {
@@ -171,60 +167,72 @@ function setAuthMode(mode) {
 
   const isLogin = mode === "login";
 
-  loginTab.classList.toggle(
+  loginTab?.classList.toggle(
     "active",
     isLogin
   );
 
-  signupTab.classList.toggle(
+  signupTab?.classList.toggle(
     "active",
     !isLogin
   );
 
-  nameInput.classList.toggle(
+  nameInput?.classList.toggle(
     "hidden",
     isLogin
   );
 
-  authBtn.textContent =
-    isLogin
-      ? "Login"
-      : "Create account";
+  if (authBtn) {
+    authBtn.textContent =
+      isLogin
+        ? "Login"
+        : "Create account";
+  }
 
-  authError.textContent = "";
+  if (authError) {
+    authError.textContent = "";
+  }
 
 }
 
 
 /* =========================================================
-   7. LOGIN TAB
+   8. LOGIN TAB
 ========================================================= */
 
-loginTab.addEventListener(
+loginTab?.addEventListener(
   "click",
   () => {
+
     setAuthMode("login");
+
   }
 );
 
 
 /* =========================================================
-   8. SIGNUP TAB
+   9. SIGNUP TAB
 ========================================================= */
 
-signupTab.addEventListener(
+signupTab?.addEventListener(
   "click",
   () => {
+
     setAuthMode("signup");
+
   }
 );
 
 
 /* =========================================================
-   9. TOAST
+   10. TOAST
 ========================================================= */
 
 function showToast(message) {
+
+  if (!toast) {
+    return;
+  }
 
   toast.textContent = message;
 
@@ -240,22 +248,18 @@ function showToast(message) {
 
 
 /* =========================================================
-   10. ESCAPE HTML
-=========================================================
-
-   User message को HTML के रूप में execute होने से
-   बचाता है।
+   11. ESCAPE HTML
 ========================================================= */
 
 function escapeHtml(value) {
 
-  if (!value) {
+  if (value === null || value === undefined) {
     return "";
   }
 
   return String(value).replace(
     /[&<>"']/g,
-    function (character) {
+    (character) => {
 
       const map = {
         "&": "&amp;",
@@ -274,7 +278,25 @@ function escapeHtml(value) {
 
 
 /* =========================================================
-   11. FORMAT MESSAGE TIME
+   12. INITIAL LETTER
+========================================================= */
+
+function getInitial(name) {
+
+  if (!name) {
+    return "U";
+  }
+
+  return String(name)
+    .trim()
+    .charAt(0)
+    .toUpperCase() || "U";
+
+}
+
+
+/* =========================================================
+   13. FORMAT MESSAGE TIME
 ========================================================= */
 
 function formatTime(timestamp) {
@@ -283,7 +305,7 @@ function formatTime(timestamp) {
     return "";
   }
 
-  let date;
+  let date = null;
 
   try {
 
@@ -294,6 +316,20 @@ function formatTime(timestamp) {
 
       date = timestamp.toDate();
 
+    } else if (
+      typeof timestamp === "number"
+    ) {
+
+      date = new Date(timestamp);
+
+    } else if (
+      timestamp?.seconds
+    ) {
+
+      date = new Date(
+        timestamp.seconds * 1000
+      );
+
     } else {
 
       date = new Date(timestamp);
@@ -301,6 +337,15 @@ function formatTime(timestamp) {
     }
 
   } catch (error) {
+
+    return "";
+
+  }
+
+  if (
+    !date ||
+    Number.isNaN(date.getTime())
+  ) {
 
     return "";
 
@@ -318,7 +363,7 @@ function formatTime(timestamp) {
 
 
 /* =========================================================
-   12. PRIVATE CHAT ID
+   14. PRIVATE CHAT ID
 ========================================================= */
 
 function conversationId(uid1, uid2) {
@@ -334,7 +379,7 @@ function conversationId(uid1, uid2) {
 
 
 /* =========================================================
-   13. FRIENDLY FIREBASE ERRORS
+   15. FRIENDLY FIREBASE ERRORS
 ========================================================= */
 
 function friendlyError(error) {
@@ -363,13 +408,16 @@ function friendlyError(error) {
       "Too many attempts. Please try again later.",
 
     "auth/network-request-failed":
-      "Network error. Check your internet connection."
+      "Network error. Check your internet connection.",
+
+    "permission-denied":
+      "Permission denied. Check Firebase rules."
 
   };
 
   return (
-    errors[error.code] ||
-    error.message ||
+    errors[error?.code] ||
+    error?.message ||
     "Something went wrong."
   );
 
@@ -377,18 +425,22 @@ function friendlyError(error) {
 
 
 /* =========================================================
-   14. SIGNUP / LOGIN
+   16. SIGNUP / LOGIN
 ========================================================= */
 
-authForm.addEventListener(
+authForm?.addEventListener(
   "submit",
   async (event) => {
 
     event.preventDefault();
 
-    authError.textContent = "";
+    if (authError) {
+      authError.textContent = "";
+    }
 
-    authBtn.disabled = true;
+    if (authBtn) {
+      authBtn.disabled = true;
+    }
 
     try {
 
@@ -398,9 +450,26 @@ authForm.addEventListener(
       const password =
         passwordInput.value;
 
-      /* -------------------------------------
+      if (!email) {
+
+        throw new Error(
+          "Please enter your email."
+        );
+
+      }
+
+      if (!password) {
+
+        throw new Error(
+          "Please enter your password."
+        );
+
+      }
+
+
+      /* =====================================
          SIGNUP
-      ------------------------------------- */
+      ===================================== */
 
       if (authMode === "signup") {
 
@@ -423,6 +492,7 @@ authForm.addEventListener(
 
         }
 
+
         const credential =
           await createUserWithEmailAndPassword(
             auth,
@@ -430,11 +500,13 @@ authForm.addEventListener(
             password
           );
 
+
         await saveProfile(
           credential.user.uid,
           name,
-          credential.user.email
+          credential.user.email || email
         );
+
 
         showToast(
           "Account created successfully!"
@@ -442,9 +514,10 @@ authForm.addEventListener(
 
       }
 
-      /* -------------------------------------
+
+      /* =====================================
          LOGIN
-      ------------------------------------- */
+      ===================================== */
 
       else {
 
@@ -462,12 +535,23 @@ authForm.addEventListener(
 
     } catch (error) {
 
-      authError.textContent =
-        friendlyError(error);
+      console.error(
+        "Authentication error:",
+        error
+      );
+
+      if (authError) {
+
+        authError.textContent =
+          friendlyError(error);
+
+      }
 
     } finally {
 
-      authBtn.disabled = false;
+      if (authBtn) {
+        authBtn.disabled = false;
+      }
 
     }
 
@@ -476,7 +560,7 @@ authForm.addEventListener(
 
 
 /* =========================================================
-   15. SAVE USER PROFILE
+   17. SAVE USER PROFILE
 ========================================================= */
 
 async function saveProfile(
@@ -486,7 +570,11 @@ async function saveProfile(
 ) {
 
   await setDoc(
-    doc(db, "users", uid),
+    doc(
+      db,
+      "users",
+      uid
+    ),
     {
 
       uid: uid,
@@ -507,21 +595,32 @@ async function saveProfile(
 
 
 /* =========================================================
-   16. LOGOUT
+   18. LOGOUT
 ========================================================= */
 
-logoutBtn.addEventListener(
+logoutBtn?.addEventListener(
   "click",
   async () => {
 
     try {
 
+      await setOfflinePresence();
+
       await signOut(auth);
+
+      showToast(
+        "Logged out successfully."
+      );
 
     } catch (error) {
 
+      console.error(
+        "Logout error:",
+        error
+      );
+
       showToast(
-        error.message
+        friendlyError(error)
       );
 
     }
@@ -531,7 +630,7 @@ logoutBtn.addEventListener(
 
 
 /* =========================================================
-   17. AUTH STATE
+   19. AUTH STATE
 ========================================================= */
 
 onAuthStateChanged(
@@ -544,15 +643,20 @@ onAuthStateChanged(
 
       myProfile = null;
 
-      authScreen.classList.remove(
-        "hidden"
-      );
-
-      appScreen.classList.add(
-        "hidden"
-      );
-
       cleanupListeners();
+
+      if (authScreen) {
+        authScreen.classList.remove(
+          "hidden"
+        );
+      }
+
+      if (appScreen) {
+        appScreen.classList.add(
+          "hidden"
+        );
+
+      }
 
       return;
 
@@ -562,9 +666,9 @@ onAuthStateChanged(
     currentUser = user;
 
 
-    /* -------------------------------------
+    /* =====================================
        GET PROFILE
-    ------------------------------------- */
+    ===================================== */
 
     try {
 
@@ -601,6 +705,7 @@ onAuthStateChanged(
 
         };
 
+
         await saveProfile(
           myProfile.uid,
           myProfile.name,
@@ -623,51 +728,62 @@ onAuthStateChanged(
         name:
           user.email
             ?.split("@")[0] ||
-          "User"
+          "User",
+
+        email:
+          user.email || ""
 
       };
 
     }
 
 
-    /* -------------------------------------
-       SHOW USER
-    ------------------------------------- */
+    /* =====================================
+       SHOW MY PROFILE
+    ===================================== */
 
-    myName.textContent =
-      myProfile.name;
+    if (myName) {
 
-    myAvatar.textContent =
-      getInitial(
-        myProfile.name
-      );
+      myName.textContent =
+        myProfile.name;
+
+    }
+
+    if (myAvatar) {
+
+      myAvatar.textContent =
+        getInitial(
+          myProfile.name
+        );
+
+    }
 
 
-    /* -------------------------------------
+    /* =====================================
        SHOW APP
-    ------------------------------------- */
+    ===================================== */
 
-    authScreen.classList.add(
+    authScreen?.classList.add(
       "hidden"
     );
 
-    appScreen.classList.remove(
+    appScreen?.classList.remove(
       "hidden"
     );
 
 
-    /* -------------------------------------
+    /* =====================================
        START SERVICES
-    ------------------------------------- */
+    ===================================== */
 
     setOnlinePresence();
 
     listenUsers();
 
 
-    /* -------------------------------------
+    /* =====================================
        OPEN PUBLIC CHAT
-    ------------------------------------- */
+    ===================================== */
 
     openChat({
 
@@ -684,25 +800,7 @@ onAuthStateChanged(
 
 
 /* =========================================================
-   18. INITIAL LETTER
-========================================================= */
-
-function getInitial(name) {
-
-  if (!name) {
-    return "U";
-  }
-
-  return name
-    .trim()
-    .charAt(0)
-    .toUpperCase();
-
-}
-
-
-/* =========================================================
-   19. ONLINE PRESENCE
+   20. ONLINE PRESENCE
 ========================================================= */
 
 function setOnlinePresence() {
@@ -719,31 +817,24 @@ function setOnlinePresence() {
     );
 
 
-  /* -------------------------------------
-     Set online
-  ------------------------------------- */
+  const onlineData = {
 
-  set(
-    statusRef,
-    {
+    online: true,
 
-      online: true,
+    name:
+      myProfile?.name ||
+      "User",
 
-      name:
-        myProfile?.name ||
-        "User",
+    lastChanged:
+      rtdbTimestamp()
 
-      lastChanged:
-        rtdbTimestamp()
-
-    }
-  );
+  };
 
 
-  /* -------------------------------------
-     Automatically set offline
+  /* =====================================
+     Set offline automatically
      when connection closes
-  ------------------------------------- */
+  ===================================== */
 
   onDisconnect(
     statusRef
@@ -761,9 +852,28 @@ function setOnlinePresence() {
   });
 
 
-  /* -------------------------------------
-     Listen to all presence
-  ------------------------------------- */
+  /* =====================================
+     Set online
+  ===================================== */
+
+  set(
+    statusRef,
+    onlineData
+  ).catch(
+    (error) => {
+
+      console.error(
+        "Presence error:",
+        error
+      );
+
+    }
+  );
+
+
+  /* =====================================
+     Listen to presence
+  ===================================== */
 
   if (unsubscribePresence) {
 
@@ -774,7 +884,10 @@ function setOnlinePresence() {
 
   unsubscribePresence =
     onValue(
-      ref(rtdb, "presence"),
+      ref(
+        rtdb,
+        "presence"
+      ),
       (snapshot) => {
 
         presenceCache =
@@ -784,6 +897,14 @@ function setOnlinePresence() {
 
         updateChatHeaderStatus();
 
+      },
+      (error) => {
+
+        console.error(
+          "Presence listener:",
+          error
+        );
+
       }
     );
 
@@ -791,10 +912,62 @@ function setOnlinePresence() {
 
 
 /* =========================================================
-   20. LISTEN TO USERS
+   21. SET OFFLINE
+========================================================= */
+
+async function setOfflinePresence() {
+
+  if (!currentUser) {
+    return;
+  }
+
+  try {
+
+    const statusRef =
+      ref(
+        rtdb,
+        `presence/${currentUser.uid}`
+      );
+
+
+    await set(
+      statusRef,
+      {
+
+        online: false,
+
+        name:
+          myProfile?.name ||
+          "User",
+
+        lastChanged:
+          rtdbTimestamp()
+
+      }
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Offline presence error:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   22. LISTEN TO USERS
 ========================================================= */
 
 function listenUsers() {
+
+  if (!currentUser) {
+    return;
+  }
+
 
   if (unsubscribeUsers) {
 
@@ -805,7 +978,10 @@ function listenUsers() {
 
   unsubscribeUsers =
     onSnapshot(
-      collection(db, "users"),
+      collection(
+        db,
+        "users"
+      ),
       (snapshot) => {
 
         usersCache =
@@ -816,7 +992,8 @@ function listenUsers() {
             )
             .filter(
               (user) =>
-                user.uid !== currentUser.uid
+                user.uid !==
+                currentUser.uid
             );
 
 
@@ -841,20 +1018,25 @@ function listenUsers() {
 
 
 /* =========================================================
-   21. RENDER USERS
+   23. RENDER USERS
 ========================================================= */
 
 function renderUsers() {
 
-  if (!currentUser) {
+  if (
+    !currentUser ||
+    !userList
+  ) {
+
     return;
+
   }
 
 
   const search =
-    userSearch.value
-      .trim()
-      .toLowerCase();
+    userSearch?.value
+      ?.trim()
+      .toLowerCase() || "";
 
 
   const filteredUsers =
@@ -869,12 +1051,16 @@ function renderUsers() {
         (a, b) => {
 
           const onlineA =
-            presenceCache[a.uid]?.online
+            presenceCache[
+              a.uid
+            ]?.online
               ? 1
               : 0;
 
           const onlineB =
-            presenceCache[b.uid]?.online
+            presenceCache[
+              b.uid
+            ]?.online
               ? 1
               : 0;
 
@@ -887,17 +1073,25 @@ function renderUsers() {
   userList.innerHTML = "";
 
 
-  if (filteredUsers.length === 0) {
+  if (
+    filteredUsers.length === 0
+  ) {
 
     const empty =
-      document.createElement("div");
+      document.createElement(
+        "div"
+      );
 
-    empty.className = "muted";
+    empty.className =
+      "muted";
 
-    empty.style.padding = "20px";
+    empty.style.padding =
+      "20px";
 
     empty.textContent =
-      "No users found.";
+      search
+        ? "No users found."
+        : "No other users yet.";
 
     userList.appendChild(
       empty
@@ -912,7 +1106,9 @@ function renderUsers() {
     (user) => {
 
       const row =
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
       row.className =
         "user-item";
@@ -981,7 +1177,8 @@ function renderUsers() {
                 user.uid
               ),
 
-            uid: user.uid,
+            uid:
+              user.uid,
 
             name:
               user.name || "User"
@@ -1003,10 +1200,10 @@ function renderUsers() {
 
 
 /* =========================================================
-   22. USER SEARCH
+   24. USER SEARCH
 ========================================================= */
 
-userSearch.addEventListener(
+userSearch?.addEventListener(
   "input",
   () => {
 
@@ -1017,7 +1214,7 @@ userSearch.addEventListener(
 
 
 /* =========================================================
-   23. PUBLIC CHAT CLICK
+   25. PUBLIC CHAT CLICK
 ========================================================= */
 
 const publicRoom =
@@ -1049,33 +1246,49 @@ if (publicRoom) {
 
 
 /* =========================================================
-   24. OPEN CHAT
+   26. OPEN CHAT
 ========================================================= */
-
 function openChat(chat) {
+
+  if (!currentUser) {
+    return;
+  }
+
 
   selectedChat = chat;
 
 
-  /* -------------------------------------
+  /* =====================================
      Header
-  ------------------------------------- */
+  ===================================== */
 
-  chatName.textContent =
-    chat.name;
+  if (chatName) {
+
+    chatName.textContent =
+      chat.name;
+
+ }
 
 
   if (chat.type === "public") {
 
-    chatAvatar.textContent =
-      "🌐";
+    if (chatAvatar) {
+
+      chatAvatar.textContent =
+        "🌐";
+
+    }
 
   } else {
 
-    chatAvatar.textContent =
-      getInitial(
-        chat.name
-      );
+    if (chatAvatar) {
+
+      chatAvatar.textContent =
+        getInitial(
+          chat.name
+        );
+
+    }
 
   }
 
@@ -1083,21 +1296,25 @@ function openChat(chat) {
   updateChatHeaderStatus();
 
 
-  /* -------------------------------------
+  /* =====================================
      Mobile
-  ------------------------------------- */
+  ===================================== */
 
-  appScreen.classList.add(
+  appScreen?.classList.add(
     "mobile-chat"
   );
 
 
-  typingEl.textContent = "";
+  if (typingEl) {
+
+    typingEl.textContent = "";
+
+  }
 
 
-  /* -------------------------------------
-     Remove old listener
-  ------------------------------------- */
+  /* =====================================
+     Remove old message listener
+  ===================================== */
 
   if (unsubscribeMessages) {
 
@@ -1108,14 +1325,29 @@ function openChat(chat) {
   }
 
 
-  /* -------------------------------------
-     Firestore path
-  ------------------------------------- */
+  /* =====================================
+     Remove old typing listener
+  ===================================== */
+
+  if (unsubscribeTyping) {
+
+    unsubscribeTyping();
+
+    unsubscribeTyping = null;
+
+  }
+
+
+  /* =====================================
+     Firestore message collection
+  ===================================== */
 
   let messagesCollection;
 
 
-  if (chat.type === "public") {
+  if (
+    chat.type === "public"
+  ) {
 
     messagesCollection =
       collection(
@@ -1136,9 +1368,9 @@ function openChat(chat) {
   }
 
 
-  /* -------------------------------------
-     Query
-  ------------------------------------- */
+  /* =====================================
+     Message query
+  ===================================== */
 
   const messagesQuery =
     query(
@@ -1151,14 +1383,19 @@ function openChat(chat) {
     );
 
 
-  /* -------------------------------------
-     Listen
-  ------------------------------------- */
+  /* =====================================
+     Listen to messages
+  ===================================== */
 
   unsubscribeMessages =
     onSnapshot(
       messagesQuery,
       (snapshot) => {
+
+        if (!messagesEl) {
+          return;
+        }
+
 
         messagesEl.innerHTML = "";
 
@@ -1190,33 +1427,49 @@ function openChat(chat) {
         );
 
 
-        messagesEl.innerHTML = `
+        if (messagesEl) {
 
-          <div class="error">
+          messagesEl.innerHTML = `
 
-            Could not load messages.
+            <div class="error">
 
-            <br>
+              Could not load messages.
 
-            ${escapeHtml(
-              error.message
-            )}
+              <br><br>
 
-          </div>
+              ${escapeHtml(
+                friendlyError(error)
+              )}
 
-        `;
+            </div>
+
+          `;
+
+        }
 
       }
     );
+
+
+  /* =====================================
+     Listen to typing
+  ===================================== */
+
+  listenTyping();
 
 }
 
 
 /* =========================================================
-   25. UPDATE CHAT HEADER STATUS
+   27. UPDATE CHAT HEADER STATUS
 ========================================================= */
 
 function updateChatHeaderStatus() {
+
+  if (!chatStatus) {
+    return;
+  }
+
 
   if (
     selectedChat.type ===
@@ -1241,4 +1494,598 @@ function updateChatHeaderStatus() {
 
   chatStatus.textContent =
     online
-     
+      ? "Online"
+      : "Offline";
+
+}
+
+
+/* =========================================================
+   28. RENDER MESSAGE
+========================================================= */
+
+function renderMessage(message) {
+
+  if (!messagesEl) {
+    return;
+  }
+
+
+  const isMine =
+    message.uid ===
+    currentUser?.uid;
+
+
+  const messageElement =
+    document.createElement(
+      "div"
+    );
+
+
+  messageElement.className =
+    `message ${
+      isMine
+        ? "message-mine"
+        : "message-other"
+    }`;
+
+
+  const senderName =
+    message.name ||
+    "User";
+
+
+  const text =
+    message.text || "";
+
+
+  const time =
+    formatTime(
+      message.createdAt
+    );
+
+
+  messageElement.innerHTML = `
+
+    ${
+      !isMine &&
+      selectedChat.type === "public"
+        ? `
+          <div class="message-sender">
+            ${escapeHtml(senderName)}
+          </div>
+        `
+        : ""
+    }
+
+    <div class="message-text">
+      ${escapeHtml(text)}
+    </div>
+
+    <div class="message-time">
+      ${escapeHtml(time)}
+    </div>
+
+  `;
+
+
+  messagesEl.appendChild(
+    messageElement
+  );
+
+}
+
+
+/* =========================================================
+   29. SEND MESSAGE
+========================================================= */
+
+messageForm?.addEventListener(
+  "submit",
+  async (event) => {
+
+    event.preventDefault();
+
+    await sendMessage();
+
+  }
+);
+
+
+/* =========================================================
+   30. SEND MESSAGE FUNCTION
+========================================================= */
+
+async function sendMessage() {
+
+  if (
+    !currentUser ||
+    !messageInput ||
+    isSendingMessage
+  ) {
+
+    return;
+
+  }
+
+
+  const text =
+    messageInput.value.trim();
+
+
+  if (!text) {
+    return;
+  }
+
+
+  if (text.length > 1000) {
+
+    showToast(
+      "Message is too long. Maximum 1000 characters."
+    );
+
+    return;
+
+  }
+
+
+  isSendingMessage = true;
+
+
+  try {
+
+    let messagesCollection;
+
+
+    if (
+      selectedChat.type ===
+      "public"
+    ) {
+
+      messagesCollection =
+        collection(
+          db,
+          "publicMessages"
+        );
+
+    } else {
+
+      messagesCollection =
+        collection(
+          db,
+          "privateChats",
+          selectedChat.id,
+          "messages"
+        );
+
+    }
+
+
+    await addDoc(
+      messagesCollection,
+      {
+
+        uid:
+          currentUser.uid,
+
+        name:
+          myProfile?.name ||
+          "User",
+
+        text:
+          text,
+
+        createdAt:
+          serverTimestamp()
+
+      }
+    );
+
+
+    messageInput.value = "";
+
+    stopTyping();
+
+
+    /* Keep focus on input */
+
+    messageInput.focus();
+
+
+  } catch (error) {
+
+    console.error(
+      "Send message error:",
+      error
+    );
+
+    showToast(
+      friendlyError(error)
+    );
+
+  } finally {
+
+    isSendingMessage = false;
+
+  }
+
+}
+
+
+/* =========================================================
+   31. TYPING INDICATOR
+========================================================= */
+
+function typingPath() {
+
+  return `typing/${selectedChat.id}`;
+
+}
+
+
+/* =========================================================
+   32. LISTEN TO TYPING
+========================================================= */
+
+function listenTyping() {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  if (unsubscribeTyping) {
+
+    unsubscribeTyping();
+
+    unsubscribeTyping = null;
+
+  }
+
+
+  const typingRef =
+    ref(
+      rtdb,
+      typingPath()
+    );
+
+
+  unsubscribeTyping =
+    onValue(
+      typingRef,
+      (snapshot) => {
+
+        const typingUsers =
+          snapshot.val() || {};
+
+
+        const otherTypingUsers =
+          Object.entries(
+            typingUsers
+          )
+            .filter(
+              ([uid, value]) =>
+                uid !== currentUser.uid &&
+                value?.typing === true
+            );
+
+
+        if (
+          otherTypingUsers.length === 0
+        ) {
+
+          if (typingEl) {
+            typingEl.textContent = "";
+          }
+
+          return;
+
+        }
+
+
+        const names =
+          otherTypingUsers.map(
+            ([uid, value]) =>
+              value?.name || "Someone"
+          );
+
+
+        if (typingEl) {
+
+          if (names.length === 1) {
+
+            typingEl.textContent =
+              `${names[0]} is typing...`;
+
+          } else {
+
+            typingEl.textContent =
+              `${names.slice(0, 2).join(", ")} are typing...`;
+
+          }
+
+        }
+
+      },
+      (error) => {
+
+        console.error(
+          "Typing listener error:",
+          error
+        );
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   33. SET TYPING
+========================================================= */
+
+async function setTyping() {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  const typingUserRef =
+    ref(
+      rtdb,
+      `${typingPath()}/${currentUser.uid}`
+    );
+
+
+  try {
+
+    await set(
+      typingUserRef,
+      {
+
+        typing: true,
+
+        name:
+          myProfile?.name ||
+          "User",
+
+        updatedAt:
+          rtdbTimestamp()
+
+      }
+    );
+
+
+    clearTimeout(
+      typingTimer
+    );
+
+
+    typingTimer =
+      setTimeout(
+        () => {
+
+          stopTyping();
+
+        },
+        3000
+      );
+
+  } catch (error) {
+
+    console.error(
+      "Set typing error:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   34. STOP TYPING
+========================================================= */
+
+async function stopTyping() {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  clearTimeout(
+    typingTimer
+  );
+
+
+  const typingUserRef =
+    ref(
+      rtdb,
+      `${typingPath()}/${currentUser.uid}`
+    );
+
+
+  try {
+
+    await set(
+      typingUserRef,
+      {
+
+        typing: false,
+
+        name:
+          myProfile?.name ||
+          "User",
+
+        updatedAt:
+          rtdbTimestamp()
+
+      }
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Stop typing error:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   35. MESSAGE INPUT TYPING EVENTS
+========================================================= */
+
+messageInput?.addEventListener(
+  "input",
+  () => {
+
+    const value =
+      messageInput.value.trim();
+
+
+    if (!value) {
+
+      stopTyping();
+
+      return;
+
+    }
+
+
+    setTyping();
+
+  }
+);
+
+
+/* =========================================================
+   36. MESSAGE INPUT ENTER KEY
+========================================================= */
+
+messageInput?.addEventListener(
+  "keydown",
+  (event) => {
+
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+
+      event.preventDefault();
+
+      sendMessage();
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   37. SCROLL MESSAGES
+========================================================= */
+
+function scrollMessagesToBottom() {
+
+  if (!messagesEl) {
+    return;
+  }
+
+
+  requestAnimationFrame(
+    () => {
+
+      messagesEl.scrollTop =
+        messagesEl.scrollHeight;
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   38. BACK BUTTON
+========================================================= */
+
+backBtn?.addEventListener(
+  "click",
+  () => {
+
+    appScreen?.classList.remove(
+      "mobile-chat"
+    );
+
+    stopTyping();
+
+  }
+);
+/* =========================================================
+   39. CLEANUP LISTENERS
+========================================================= */
+
+function cleanupListeners() {
+
+  if (unsubscribeMessages) {
+
+    unsubscribeMessages();
+
+    unsubscribeMessages = null;
+
+  }
+
+
+  if (unsubscribeUsers) {
+
+    unsubscribeUsers();
+
+    unsubscribeUsers = null;
+
+  }
+
+
+  if (unsubscribePresence) {
+
+    unsubscribePresence();
+
+    unsubscribePresence = null;
+
+  }
+
+
+  if (unsubscribeTyping) {
+
+    unsubscribeTyping();
+
+    unsubscribeTyping = null;
+
+  }
+
+
+  clearTimeout(
+    typingTimer
+  );
+
+}
+
+
+/* =========================================================
+   40. INITIAL AUTH MODE
+========================================================= */
+
+setAuthMode("login");
+
+
+/* =========================================================
+   41. CONSOLE MESSAGE
+========================================================= */
+
+console.log(
+  "Firebase Chatroom app loaded successfully."
+);
