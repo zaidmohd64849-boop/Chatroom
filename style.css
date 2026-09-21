@@ -1297,7 +1297,21 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+.delete-account-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #d32f2f;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+}
 
+.delete-account-btn:hover {
+  opacity: 0.9;
+}
 /* =====================================================
    END
 ===================================================== */
