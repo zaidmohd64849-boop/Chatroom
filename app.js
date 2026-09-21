@@ -18,6 +18,7 @@ import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut
+  deleteUser
 } from
   "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 
@@ -28,6 +29,9 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
+  deleteDoc,
+  where,
   onSnapshot,
   query,
   orderBy,
@@ -40,6 +44,7 @@ import {
   getDatabase,
   ref,
   set,
+  remove,
   onDisconnect,
   onValue,
   serverTimestamp as rtdbTimestamp
@@ -1248,6 +1253,7 @@ if (publicRoom) {
 /* =========================================================
    26. OPEN CHAT
 ========================================================= */
+
 function openChat(chat) {
 
   if (!currentUser) {
@@ -2089,3 +2095,190 @@ setAuthMode("login");
 console.log(
   "Firebase Chatroom app loaded successfully."
 );
+/* =========================================================
+   42. COMPLETE ACCOUNT DELETION
+========================================================= */
+
+const deleteAccountBtn =
+  document.getElementById("deleteAccountBtn");
+
+deleteAccountBtn?.addEventListener(
+  "click",
+  async () => {
+
+    if (!currentUser) return;
+
+    const uid = currentUser.uid;
+
+    const confirmed = confirm(
+      "Delete Account permanently?\n\n" +
+      "Your profile, public messages and private chats " +
+      "will be permanently deleted."
+    );
+
+    if (!confirmed) return;
+
+    const finalConfirmed = confirm(
+      "FINAL WARNING\n\n" +
+      "Your account and all your chats will be deleted " +
+      "for everyone.\n\n" +
+      "This cannot be undone."
+    );
+
+    if (!finalConfirmed) return;
+
+    try {
+
+      deleteAccountBtn.disabled = true;
+
+      deleteAccountBtn.textContent =
+        "Deleting...";
+
+     /* Delete public messages */
+
+const publicQuery = query(
+  collection(db, "publicMessages"),
+  where("uid", "==", uid)
+);
+
+const publicSnapshot =
+  await getDocs(publicQuery);
+
+for (const messageDoc of publicSnapshot.docs) {
+  await deleteDoc(messageDoc.ref);
+}
+
+
+/* Get all users */
+
+const usersSnapshot = await getDocs(
+  collection(db, "users")
+);
+
+
+/* Delete private chats */
+
+for (const userDoc of usersSnapshot.docs) {
+
+  const otherUid = userDoc.data().uid;
+
+  if (!otherUid || otherUid === uid) {
+    continue;
+  }
+
+  const chatId =
+    conversationId(uid, otherUid);
+
+  const messagesRef = collection(
+    db,
+    "privateChats",
+    chatId,
+    "messages"
+  );
+
+  const messagesSnapshot =
+    await getDocs(messagesRef);
+
+  for (const messageDoc of messagesSnapshot.docs) {
+    await deleteDoc(messageDoc.ref);
+  }
+
+  await deleteDoc(
+    doc(db, "privateChats", chatId)
+  );
+}
+/* Remove presence */
+
+try {
+  await remove(
+    ref(rtdb, `presence/${uid}`)
+  );
+} catch (error) {
+  console.log(
+    "Presence cleanup:",
+    error
+  );
+}
+
+
+/* Remove typing status */
+
+try {
+
+  await remove(
+    ref(rtdb, `typing/public/${uid}`)
+  );
+
+  for (const userDoc of usersSnapshot.docs) {
+
+    const otherUid =
+      userDoc.data().uid;
+
+    if (!otherUid || otherUid === uid) {
+      continue;
+    }
+
+    const chatId =
+      conversationId(uid, otherUid);
+
+    await remove(
+      ref(
+        rtdb,
+        `typing/${chatId}/${uid}`
+      )
+    );
+  }
+
+} catch (error) {
+
+  console.log(
+    "Typing cleanup:",
+    error
+  );
+}
+/* Delete user profile */
+
+await deleteDoc(
+  doc(db, "users", uid)
+);
+
+
+/* Delete Firebase Authentication account */
+
+await deleteUser(currentUser);
+       } catch (error) {
+
+      console.error(
+        "Account deletion error:",
+        error
+      );
+
+      if (
+        error.code === "auth/requires-recent-login"
+      ) {
+
+        alert(
+          "Security ke liye recent login required hai.\n\n" +
+          "Logout karke dobara login karo, " +
+          "phir Delete Account try karo."
+        );
+
+      } else {
+
+        alert(
+          "Account deletion failed:\n\n" +
+          friendlyError(error)
+        );
+
+      }
+
+    } finally {
+      deleteAccountBtn.disabled = false;
+
+      deleteAccountBtn.textContent =
+        "Delete Account";
+    }
+
+  }
+);
+   
